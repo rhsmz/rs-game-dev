@@ -69,21 +69,18 @@ impl World {
     /// Entity の Component を取得する。
     #[must_use]
     pub fn get_component<T: Component>(&self, entity: Entity) -> Option<&T> {
-        self.get_storage::<T>()
-            .and_then(|storage| storage.get(entity))
+        self.get_storage::<T>().and_then(|storage| storage.get(entity))
     }
 
     /// Entity の Component を可変参照で取得する。
     #[must_use]
     pub fn get_component_mut<T: Component>(&mut self, entity: Entity) -> Option<&mut T> {
-        self.get_storage_mut::<T>()
-            .and_then(|storage| storage.get_mut(entity))
+        self.get_storage_mut::<T>().and_then(|storage| storage.get_mut(entity))
     }
 
     /// Entity の Component を削除する。
     pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
-        self.get_storage_mut::<T>()
-            .and_then(|storage| storage.remove_component(entity))
+        self.get_storage_mut::<T>().and_then(|storage| storage.remove_component(entity))
     }
 
     /// 指定型の `ComponentStorage` を取得する。
@@ -216,9 +213,7 @@ mod tests {
         assert!((world.get_resource::<GameTime>().unwrap().0 - 0.0).abs() < f64::EPSILON);
 
         world.get_resource_mut::<GameTime>().unwrap().0 += 0.016;
-        assert!(
-            (world.get_resource::<GameTime>().unwrap().0 - 0.016).abs() < f64::EPSILON
-        );
+        assert!((world.get_resource::<GameTime>().unwrap().0 - 0.016).abs() < f64::EPSILON);
     }
 
     #[test]

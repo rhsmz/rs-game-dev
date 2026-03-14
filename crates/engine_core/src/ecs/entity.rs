@@ -47,11 +47,7 @@ impl EntityAllocator {
     /// 新しい `EntityAllocator` を作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            generations: Vec::new(),
-            free_list: Vec::new(),
-            alive_count: 0,
-        }
+        Self { generations: Vec::new(), free_list: Vec::new(), alive_count: 0 }
     }
 
     /// 新しい Entity を割り当てる。
@@ -60,19 +56,13 @@ impl EntityAllocator {
 
         if let Some(index) = self.free_list.pop() {
             // 再利用: deallocate 時に世代はすでにインクリメント済み
-            Entity {
-                index,
-                generation: self.generations[index as usize],
-            }
+            Entity { index, generation: self.generations[index as usize] }
         } else {
             // 新規割り当て
             let index = u32::try_from(self.generations.len())
                 .expect("Entity index overflow: too many entities allocated");
             self.generations.push(0);
-            Entity {
-                index,
-                generation: 0,
-            }
+            Entity { index, generation: 0 }
         }
     }
 
@@ -174,10 +164,7 @@ mod tests {
 
     #[test]
     fn test_entity_display() {
-        let e = Entity {
-            index: 42,
-            generation: 3,
-        };
+        let e = Entity { index: 42, generation: 3 };
         assert_eq!(format!("{e}"), "Entity(42v3)");
     }
 }

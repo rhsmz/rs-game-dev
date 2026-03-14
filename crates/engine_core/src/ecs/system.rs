@@ -41,9 +41,7 @@ impl Schedule {
     /// 新しい空のスケジュールを作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            systems: Vec::new(),
-        }
+        Self { systems: Vec::new() }
     }
 
     /// System を追加する。追加順に実行される。
