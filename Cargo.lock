@@ -267,6 +267,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "engine_core",
+ "env_logger",
  "log",
  "serde",
 ]
