@@ -37,11 +37,7 @@ impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            dense: Vec::new(),
-            dense_to_entity: Vec::new(),
-            sparse: Vec::new(),
-        }
+        Self { dense: Vec::new(), dense_to_entity: Vec::new(), sparse: Vec::new() }
     }
 
     /// Entity に Component を挿入する。既存の値は上書きされる。
@@ -69,20 +65,14 @@ impl<T: Component> ComponentStorage<T> {
     #[must_use]
     pub fn get(&self, entity: Entity) -> Option<&T> {
         let idx = entity.index() as usize;
-        self.sparse
-            .get(idx)
-            .and_then(|opt| opt.map(|dense_idx| &self.dense[dense_idx]))
+        self.sparse.get(idx).and_then(|opt| opt.map(|dense_idx| &self.dense[dense_idx]))
     }
 
     /// Entity の Component を可変参照で取得する。
     #[must_use]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
         let idx = entity.index() as usize;
-        self.sparse
-            .get(idx)
-            .copied()
-            .flatten()
-            .map(|dense_idx| &mut self.dense[dense_idx])
+        self.sparse.get(idx).copied().flatten().map(|dense_idx| &mut self.dense[dense_idx])
     }
 
     /// Entity の Component を削除する。
@@ -114,10 +104,7 @@ impl<T: Component> ComponentStorage<T> {
 
     /// ストレージ内の全 Entity と Component を可変参照でイテレートする。
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
-        self.dense_to_entity
-            .iter()
-            .copied()
-            .zip(self.dense.iter_mut())
+        self.dense_to_entity.iter().copied().zip(self.dense.iter_mut())
     }
 
     /// ストレージ内の Component 数を返す。

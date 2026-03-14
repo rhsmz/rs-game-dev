@@ -15,9 +15,7 @@ impl Resources {
     /// 新しい空のリソースストアを作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            data: HashMap::new(),
-        }
+        Self { data: HashMap::new() }
     }
 
     /// リソースを登録する。同じ型のリソースが既に存在する場合は上書きされる。
@@ -28,17 +26,13 @@ impl Resources {
     /// リソースへの参照を取得する。
     #[must_use]
     pub fn get<T: Send + Sync + 'static>(&self) -> Option<&T> {
-        self.data
-            .get(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.downcast_ref::<T>())
+        self.data.get(&TypeId::of::<T>()).and_then(|boxed| boxed.downcast_ref::<T>())
     }
 
     /// リソースへの可変参照を取得する。
     #[must_use]
     pub fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut T> {
-        self.data
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.downcast_mut::<T>())
+        self.data.get_mut(&TypeId::of::<T>()).and_then(|boxed| boxed.downcast_mut::<T>())
     }
 
     /// リソースを削除して返す。

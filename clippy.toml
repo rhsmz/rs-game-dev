@@ -1,0 +1,14 @@
+# [clippy.toml]
+# Clippy のリント設定
+
+# cognitive complexity の閾値を少し下げる（デフォルトは 25）
+cognitive-complexity-threshold = 15
+
+# 不要な enum のバリアントサイズの警告閾値
+enum-variant-size-threshold = 200
+
+# type complexity の閾値
+type-complexity-threshold = 250
+
+# 大きな future を警告する閾値 (16KB)
+future-size-threshold = 16384
