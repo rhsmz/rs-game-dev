@@ -216,9 +216,7 @@ mod tests {
         assert!((world.get_resource::<GameTime>().unwrap().0 - 0.0).abs() < f64::EPSILON);
 
         world.get_resource_mut::<GameTime>().unwrap().0 += 0.016;
-        assert!(
-            (world.get_resource::<GameTime>().unwrap().0 - 0.016).abs() < f64::EPSILON
-        );
+        assert!((world.get_resource::<GameTime>().unwrap().0 - 0.016).abs() < f64::EPSILON);
     }
 
     #[test]

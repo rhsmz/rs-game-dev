@@ -146,10 +146,7 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
 
     fn contains(&self, entity: Entity) -> bool {
         let idx = entity.index() as usize;
-        self.sparse
-            .get(idx)
-            .and_then(|opt| *opt)
-            .is_some()
+        self.sparse.get(idx).and_then(|opt| *opt).is_some()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -172,10 +169,7 @@ mod tests {
     impl Component for Position {}
 
     fn entity(index: u32, generation: u32) -> Entity {
-        Entity {
-            index,
-            generation,
-        }
+        Entity { index, generation }
     }
 
     #[test]

@@ -2,3 +2,11 @@
 //!
 //! C/C++ ライブラリ (`Filament`, `Live2D` `Cubism` SDK) の
 //! バインディングを隔離し、安全な Rust API でラップする。
+
+pub struct FfiBinding;
+
+impl FfiBinding {
+    pub fn new() -> Self {
+        Self
+    }
+}
