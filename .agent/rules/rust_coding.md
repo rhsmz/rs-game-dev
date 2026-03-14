@@ -1,0 +1,118 @@
+# Rust コーディング規約
+
+## 命名規則
+
+| 対象 | 形式 | 例 |
+|------|------|-----|
+| クレート名 | `snake_case` | `engine_core` |
+| モジュール・ファイル | `snake_case` | `scene_manager.rs` |
+| 構造体・列挙型・トレイト | `PascalCase` | `SceneManager`, `CharaType` |
+| 関数・メソッド・変数 | `snake_case` | `load_scene()`, `chara_id` |
+| 定数 | `SCREAMING_SNAKE_CASE` | `MAX_ENTITIES` |
+| 型パラメータ | 1文字大文字 or 意味的名称 | `T`, `S: System` |
+| ライフタイム | 短い小文字 | `'a`, `'ctx` |
+
+## エラーハンドリング
+
+- ライブラリクレート: `thiserror` で型付きエラーを定義
+- アプリケーションクレート: `anyhow` で簡潔なエラー伝播
+- `unwrap()` / `expect()` は本番コードで原則禁止（テスト・初期化の明示的パニックのみ許可）
+- エラー型はモジュールごとに `error.rs` に集約
+
+```rust
+// ✅ Good
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum AssetError {
+    #[error("asset not found: {path}")]
+    NotFound { path: String },
+    #[error("failed to decode: {0}")]
+    Decode(#[from] std::io::Error),
+}
+
+// ❌ Bad
+fn load() {
+    let data = std::fs::read("file").unwrap(); // パニックの危険
+}
+```
+
+## `unsafe` ルール
+
+- `unsafe` は FFI 境界（Live2D SDK, Filament API）のみに限定
+- すべての `unsafe` ブロックに `// SAFETY:` コメントで安全性の根拠を記述
+- `unsafe` ラッパーは専用モジュール（`ffi/`）に隔離し、安全な公開 API でラップ
+
+```rust
+// SAFETY: Filament の Engine::create は null チェック済み。
+// エンジンのライフタイムはアプリケーションと同一。
+unsafe {
+    let engine = filament_sys::Engine_create();
+    assert!(!engine.is_null());
+}
+```
+
+## Lint & フォーマット
+
+- `cargo fmt -- --check` を常に通すこと
+- `cargo clippy -- -D warnings` で警告をエラー扱い
+- 推奨 Clippy lint グループ:
+
+```toml
+# Cargo.toml (workspace)
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "warn"
+```
+
+## ドキュメンテーション
+
+- 公開 API (`pub`) にはすべて `///` doc コメントを付与
+- モジュールレベルで `//!` を用いた概要説明を記載
+- コード内の複雑なロジックには `//` コメントで意図を説明
+- `# Examples` セクションを doc コメントに含め、`cargo test --doc` で検証可能に
+
+## モジュール構成
+
+- 1ファイル 400行 以下を目安にモジュール分割
+- `mod.rs` は re-export のみ、ロジックを書かない
+- 可視性は最小限（`pub(crate)` → `pub(super)` → `pub`）
+
+## テスト
+
+- ユニットテスト: 同一ファイル内の `#[cfg(test)] mod tests`
+- 統合テスト: `tests/` ディレクトリ
+- テスト関数名は `test_<対象>_<条件>_<期待結果>` 形式
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_asset_loader_missing_file_returns_not_found() {
+        let result = load_asset("nonexistent.png");
+        assert!(matches!(result, Err(AssetError::NotFound { .. })));
+    }
+}
+```
+
+## 型システム活用
+
+- 状態遷移は列挙型 + 型状態パターンで表現
+- `newtype` パターンでプリミティブ型の誤用を防止
+- Generics に適切なトレイト境界を設定
+
+```rust
+// ✅ newtype でドメイン型を明確に
+pub struct CharaId(pub String);
+pub struct SoundId(pub String);
+```
+
+## 並行処理
+
+- スレッド間共有は `Arc<Mutex<T>>` より `mpsc::channel` (メッセージパッシング) を優先
+- ECS の System 間データ受け渡しは ECS フレームワーク機構を利用
+- `Send + Sync` 境界を意識したデータ設計

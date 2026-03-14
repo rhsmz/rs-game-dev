@@ -1,0 +1,96 @@
+# アセット管理規約
+
+## ディレクトリ構造
+
+```text
+assets/
+├── common/             # 全言語共通（サウンド、共通パーツ）
+└── ja/                 # 日本語（デフォルト・マスター）
+    ├── chara/          # Live2D(.model3.json), VRM, FBX, PNG
+    ├── bg/             # 背景画像、HDR
+    ├── voice/          # 音声ファイル
+    ├── metadata/       # 各種CSVファイル
+    └── image/          # 汎用画像、CG
+```
+
+## ルーティング規則
+
+### 1. 共通リソース (`common_` 接頭辞)
+- スクリプトで `common_` 接頭辞付き ID を指定すると `assets/common/` から検索
+- 全言語で共有されるサウンド、UI パーツ等が対象
+
+### 2. ローカライズリソース (接頭辞なし)
+- `assets/{current_lang}/` を優先的に検索
+
+### 3. 自動フォールバック
+- 現在の言語ディレクトリに素材がない場合、`assets/ja/` を自動参照
+- フォールバックチェーン: `assets/{lang}/` → `assets/ja/`
+
+## メタデータ CSV 形式
+
+すべてのメタデータは `serde` 経由で型安全にデシリアライズする。CSV ファイルは `assets/{lang}/metadata/` に配置する。
+
+### `chara.csv` — キャラクター・モデル管理
+
+| 項目名 | 型 | 説明 |
+|--------|-----|------|
+| `chara_id` | `String` | スクリプト参照用の一意 ID |
+| `type` | `Enum` | `LIVE2D` / `VRM` / `FBX` / `2D_SPRITE` |
+| `file_path` | `String` | 基本パス（ルーティング規則適用） |
+| `anchor_x` | `f32` | 表示中心点 X (0.0〜1.0) |
+| `anchor_y` | `f32` | 表示中心点 Y (0.0〜1.0) |
+| `base_scale` | `f32` | Filament 空間内の基本スケール |
+| `physics` | `Enum` | `ENABLED` / `DISABLED` (揺れ物物理) |
+| `metadata` | `String` | `.model3.json` や表情定義パス |
+
+### `sound.csv` — 音響管理
+
+| 項目名 | 型 | 説明 |
+|--------|-----|------|
+| `sound_id` | `String` | スクリプト参照 ID |
+| `type` | `Enum` | `BGM` / `SE` |
+| `file_path` | `String` | ファイルパス |
+| `volume` | `f32` | 基本音量 (0.0〜1.0) |
+| `loop_start` | `f32` | ループ開始（秒）。0 = 先頭 |
+| `loop_end` | `f32` | ループ終了（秒）。0 = 末尾 |
+
+### `bg.csv` — 背景管理
+
+| 項目名 | 型 | 説明 |
+|--------|-----|------|
+| `bg_id` | `String` | スクリプト参照 ID |
+| `type` | `Enum` | `STATIC` / `PANORAMA` / `3D_SCENE` |
+| `file_path` | `String` | ファイルパス |
+| `ibl_intensity` | `f32` | IBL 強度 |
+| `blur_factor` | `f32` | ぼかし係数 |
+
+### `images.csv` — イベントCG・アイコン管理
+
+| 項目名 | 型 | 説明 |
+|--------|-----|------|
+| `image_id` | `String` | 参照 ID |
+| `file_path` | `String` | ファイルパス |
+| `category` | `Enum` | `EVENT_CG` / `ITEM_ICON` / `UI` |
+| `gallery_unlock` | `bool` | ギャラリー解禁フラグ |
+
+### `voices.csv` — ボイス管理
+
+| 項目名 | 型 | 説明 |
+|--------|-----|------|
+| `voice_id` | `String` | 参照 ID |
+| `file_path` | `String` | 音声パス |
+| `subtitle` | `String` | 字幕テキスト |
+| `volume` | `f32` | 個別音量 (0.0〜1.0) |
+
+## アセットロード規約
+
+- 非同期ロードを前提（`async fn load_asset()`）
+- ロード済みアセットはキャッシュマネージャーで管理
+- シーン遷移時に不要アセットをパージ（メモリーリーク防止）
+- ロード失敗時は `AssetError` を返し、フォールバック画像/サウンドを使用
+
+## ファイル命名規則
+
+- 全ファイル名は `snake_case`
+- ID はメタデータ CSV で管理し、ファイル名から自動生成しない
+- 拡張子は原本のまま維持（`.model3.json`, `.vrm`, `.fbx`, `.hdr` 等）
