@@ -16,11 +16,18 @@ pub(crate) trait AnyComponentStorage: Send + Sync {
     /// Entity に紐づく Component を削除する。
     fn remove(&mut self, entity: Entity) -> bool;
     /// Entity をストレージが保持しているか確認する。
+    #[allow(dead_code)]
     fn contains(&self, entity: Entity) -> bool;
     /// `Any` への参照を返す（ダウンキャスト用）。
     fn as_any(&self) -> &dyn Any;
     /// `Any` への可変参照を返す（ダウンキャスト用）。
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// ストレージに格納されている Component 数を返す。
+    #[allow(dead_code)]
+    fn len(&self) -> usize;
+    /// ストレージが空かどうかを返す。
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool;
 }
 
 /// `SparseSet` ベースの型付き Component ストレージ。
@@ -36,7 +43,7 @@ pub struct ComponentStorage<T: Component> {
 impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { dense: Vec::new(), dense_to_entity: Vec::new(), sparse: Vec::new() }
     }
 
@@ -143,9 +150,125 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn len(&self) -> usize {
+        Self::len(self)
+    }
+
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+}
+
+/// メモリが連続した `DenseArray` ベースの Component ストレージ。
+///
+/// 全要素のイテレーションが極めて高速だが、削除はコストが高い（または未サポート）。
+/// 変更頻度が少なく参照の多い静的なコンポーネントに適している。
+pub struct DenseStorage<T: Component> {
+    components: Vec<T>,
+    entities: Vec<Entity>,
+    /// Entity の index と generation をキーにした逆引きマップ
+    entity_to_index: std::collections::HashMap<Entity, usize>,
+}
+
+impl<T: Component> DenseStorage<T> {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            components: Vec::new(),
+            entities: Vec::new(),
+            entity_to_index: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, entity: Entity, component: T) {
+        if let Some(&idx) = self.entity_to_index.get(&entity) {
+            self.components[idx] = component;
+        } else {
+            let idx = self.components.len();
+            self.components.push(component);
+            self.entities.push(entity);
+            self.entity_to_index.insert(entity, idx);
+        }
+    }
+
+    #[must_use]
+    pub fn get(&self, entity: Entity) -> Option<&T> {
+        self.entity_to_index.get(&entity).map(|&idx| &self.components[idx])
+    }
+
+    #[must_use]
+    pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
+        self.entity_to_index.get(&entity).map(|&idx| &mut self.components[idx])
+    }
+
+    pub fn remove_component(&mut self, entity: Entity) -> Option<T> {
+        if let Some(idx) = self.entity_to_index.remove(&entity) {
+            let last_idx = self.components.len() - 1;
+            if idx != last_idx {
+                let moved_entity = self.entities[last_idx];
+                self.entity_to_index.insert(moved_entity, idx);
+            }
+            self.entities.swap_remove(idx);
+            Some(self.components.swap_remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Entity, &T)> {
+        self.entities.iter().copied().zip(self.components.iter())
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
+        self.entities.iter().copied().zip(self.components.iter_mut())
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.components.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.components.is_empty()
+    }
+}
+
+impl<T: Component> Default for DenseStorage<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Component> AnyComponentStorage for DenseStorage<T> {
+    fn remove(&mut self, entity: Entity) -> bool {
+        self.remove_component(entity).is_some()
+    }
+
+    fn contains(&self, entity: Entity) -> bool {
+        self.entity_to_index.contains_key(&entity)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn len(&self) -> usize {
+        Self::len(self)
+    }
+
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -205,13 +328,63 @@ mod tests {
         storage.insert(entity(0, 0), Position { x: 1.0, y: 1.0 });
         storage.insert(entity(1, 0), Position { x: 2.0, y: 2.0 });
 
-        let items: Vec<_> = storage.iter().collect();
-        assert_eq!(items.len(), 2);
+        let count = storage.iter().count();
+        assert_eq!(count, 2);
     }
 
     #[test]
     fn test_get_nonexistent_returns_none() {
         let storage = ComponentStorage::<Position>::new();
         assert!(storage.get(entity(99, 0)).is_none());
+    }
+
+    #[test]
+    fn test_dense_storage_insert_and_get() {
+        let mut storage = DenseStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 1.0, y: 2.0 });
+
+        let pos = storage.get(e);
+        assert!(pos.is_some());
+        let pos = pos.unwrap();
+        assert!((pos.x - 1.0).abs() < f32::EPSILON);
+        assert!((pos.y - 2.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_dense_storage_overwrite() {
+        let mut storage = DenseStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 1.0, y: 2.0 });
+        storage.insert(e, Position { x: 3.0, y: 4.0 });
+
+        let pos = storage.get(e).unwrap();
+        assert!((pos.x - 3.0).abs() < f32::EPSILON);
+        assert_eq!(storage.len(), 1);
+    }
+
+    #[test]
+    fn test_dense_storage_remove() {
+        let mut storage = DenseStorage::<Position>::new();
+        let e0 = entity(0, 0);
+        let e1 = entity(1, 0);
+        storage.insert(e0, Position { x: 1.0, y: 1.0 });
+        storage.insert(e1, Position { x: 2.0, y: 2.0 });
+
+        let removed = storage.remove_component(e0);
+        assert!(removed.is_some());
+        assert!(storage.get(e0).is_none());
+        assert!(storage.get(e1).is_some());
+        assert_eq!(storage.len(), 1);
+    }
+
+    #[test]
+    fn test_dense_storage_iter() {
+        let mut storage = DenseStorage::<Position>::new();
+        storage.insert(entity(0, 0), Position { x: 1.0, y: 1.0 });
+        storage.insert(entity(1, 0), Position { x: 2.0, y: 2.0 });
+
+        let count = storage.iter().count();
+        assert_eq!(count, 2);
     }
 }

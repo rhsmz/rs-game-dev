@@ -3,10 +3,11 @@
 struct ScriptEditorApp;
 
 impl ScriptEditorApp {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self
     }
-    fn run(&mut self) {
+    fn run(&self) {
+        let _ = self; // unused self warning
         log::info!("running editor loop...");
     }
 }
@@ -14,6 +15,6 @@ impl ScriptEditorApp {
 fn main() {
     env_logger::init();
     log::info!("Script Editor starting...");
-    let mut app = ScriptEditorApp::new();
+    let app = ScriptEditorApp::new();
     app.run();
 }

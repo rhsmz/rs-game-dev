@@ -5,10 +5,12 @@
 //!
 //! バックエンド: `kira` or `rodio`
 
+#[derive(Default)]
 pub struct AudioManager;
 
 impl AudioManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }

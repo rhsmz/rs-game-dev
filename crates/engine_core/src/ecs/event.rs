@@ -13,7 +13,7 @@ pub struct EventQueue<T> {
 impl<T> EventQueue<T> {
     /// 新しい空のイベントキューを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { events: Vec::new() }
     }
 
@@ -31,7 +31,18 @@ impl<T> EventQueue<T> {
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.events.iter()
     }
+}
 
+impl<'a, T> IntoIterator for &'a EventQueue<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<T> EventQueue<T> {
     /// キュー内のイベント数を返す。
     #[must_use]
     pub fn len(&self) -> usize {
@@ -78,8 +89,8 @@ mod tests {
         queue.send("hello");
         queue.send("world");
 
-        let items: Vec<_> = queue.iter().collect();
-        assert_eq!(items.len(), 2);
+        let count = queue.iter().count();
+        assert_eq!(count, 2);
         assert_eq!(queue.len(), 2); // まだ消費されていない
     }
 

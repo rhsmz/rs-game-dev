@@ -3,10 +3,12 @@
 //! - **`VisualRng`** (`Xoshiro256++`): 演出用の非決定論的乱数
 //! - **`LogicRng`** (`ChaCha8`): ロジック用の決定論的乱数 (リプレイ再現可能)
 
+#[derive(Default)]
 pub struct RngManager;
 
 impl RngManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }

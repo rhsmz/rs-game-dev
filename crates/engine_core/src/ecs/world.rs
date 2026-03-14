@@ -54,7 +54,7 @@ impl World {
 
     /// 生存している Entity の数を返す。
     #[must_use]
-    pub fn entity_count(&self) -> usize {
+    pub const fn entity_count(&self) -> usize {
         self.entities.alive_count()
     }
 
@@ -100,6 +100,11 @@ impl World {
     }
 
     /// 指定型の `ComponentStorage` を取得するか、存在しなければ作成する。
+    ///
+    /// # Panics
+    ///
+    /// ストレージのキャストに失敗した場合（ダウンキャスト型の不一致）にパニックする。
+    #[allow(clippy::expect_used)]
     fn get_or_create_storage<T: Component>(&mut self) -> &mut ComponentStorage<T> {
         self.components
             .entry(TypeId::of::<T>())
@@ -143,15 +148,18 @@ impl Default for World {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
+    #[allow(dead_code)]
     struct Position {
         x: f32,
         y: f32,
     }
     impl Component for Position {}
 
+    #[allow(dead_code)]
     struct Velocity {
         dx: f32,
         dy: f32,
