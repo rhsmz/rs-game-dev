@@ -13,6 +13,14 @@ mod private {
     pub trait Sealed {}
 }
 
+/// 特定の Component が存在することを要求するフィルタ。
+#[derive(Debug, Default)]
+pub struct With<T: super::component::Component>(std::marker::PhantomData<T>);
+
+/// 特定の Component が存在しないことを要求するフィルタ。
+#[derive(Debug, Default)]
+pub struct Without<T: super::component::Component>(std::marker::PhantomData<T>);
+
 // --- クエリパラメータトレイト ---
 
 /// クエリパラメータとなる型のトレイト。
@@ -59,37 +67,106 @@ impl<'a, T: Component> ReadOnlyQueryParam for &'a T {
     }
 }
 
-/// 2つの Component への読み取り専用参照
-impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, &'a T2) {}
+/// フィルタ `With<T>` の実装
+impl<T: Component> private::Sealed for With<T> {}
 
-impl<'a, T1: Component, T2: Component> QueryParam for (&'a T1, &'a T2) {
-    type Item<'b> = (&'b T1, &'b T2);
+impl<T: Component> QueryParam for With<T> {
+    type Item<'a> = ();
 
-    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
-        let s2_comp = world.get_component::<T2>(entity)?;
-        Some((world.get_component::<T1>(entity)?, s2_comp))
+    fn fetch_mut<'a>(world: &'a mut World, entity: Entity) -> Option<Self::Item<'a>> {
+        if world.get_component::<T>(entity).is_some() { Some(()) } else { None }
     }
 
-    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
-        let s1 = world.get_storage::<T1>();
-        let s2 = world.get_storage::<T2>();
-
-        match (s1, s2) {
-            (Some(s1), Some(s2)) => {
-                if s1.len() <= s2.len() {
-                    Box::new(s1.iter().map(|(e, _)| e).filter(move |e| s2.get(*e).is_some()))
-                } else {
-                    Box::new(s2.iter().map(|(e, _)| e).filter(move |e| s1.get(*e).is_some()))
-                }
-            }
-            _ => Box::new(std::iter::empty()),
+    fn iter_entities<'a>(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
+        match world.get_storage::<T>() {
+            Some(storage) => Box::new(storage.iter().map(|(e, _)| e)),
+            None => Box::new(std::iter::empty()),
         }
     }
 }
 
-impl<'a, T1: Component, T2: Component> ReadOnlyQueryParam for (&'a T1, &'a T2) {
+impl<T: Component> ReadOnlyQueryParam for With<T> {
+    fn fetch<'a>(world: &'a World, entity: Entity) -> Option<Self::Item<'a>> {
+        if world.get_component::<T>(entity).is_some() { Some(()) } else { None }
+    }
+}
+
+/// フィルタ `Without<T>` の実装
+impl<T: Component> private::Sealed for Without<T> {}
+
+impl<T: Component> QueryParam for Without<T> {
+    type Item<'a> = ();
+
+    fn fetch_mut<'a>(world: &'a mut World, entity: Entity) -> Option<Self::Item<'a>> {
+        if world.get_component::<T>(entity).is_none() { Some(()) } else { None }
+    }
+
+    fn iter_entities<'a>(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
+        // Without 単体での全列挙はコストが高いため、基本的には tuple での絞り込みを推奨する
+        Box::new(std::iter::empty())
+    }
+}
+
+impl<T: Component> ReadOnlyQueryParam for Without<T> {
+    fn fetch<'a>(world: &'a World, entity: Entity) -> Option<Self::Item<'a>> {
+        if world.get_component::<T>(entity).is_none() { Some(()) } else { None }
+    }
+}
+
+/// 汎用タプル 2要素
+impl<Q1: QueryParam, Q2: ReadOnlyQueryParam> private::Sealed for (Q1, Q2) {}
+
+impl<Q1: QueryParam, Q2: ReadOnlyQueryParam> QueryParam for (Q1, Q2) {
+    type Item<'b> = (Q1::Item<'b>, Q2::Item<'b>);
+
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        let world_ptr = world as *mut World;
+        let q1 = Q1::fetch_mut(world, entity)?;
+        let q2 = unsafe { Q2::fetch(&*world_ptr, entity)? };
+        Some((q1, q2))
+    }
+
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
+        Box::new(Q1::iter_entities(world).filter(move |e| Q2::fetch(world, *e).is_some()))
+    }
+}
+
+impl<Q1: ReadOnlyQueryParam, Q2: ReadOnlyQueryParam> ReadOnlyQueryParam for (Q1, Q2) {
     fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
-        Some((world.get_component::<T1>(entity)?, world.get_component::<T2>(entity)?))
+        Some((Q1::fetch(world, entity)?, Q2::fetch(world, entity)?))
+    }
+}
+
+/// 汎用タプル 3要素
+impl<Q1: QueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> private::Sealed
+    for (Q1, Q2, Q3)
+{
+}
+
+impl<Q1: QueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> QueryParam for (Q1, Q2, Q3) {
+    type Item<'b> = (Q1::Item<'b>, Q2::Item<'b>, Q3::Item<'b>);
+
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        let world_ptr = world as *mut World;
+        let q1 = Q1::fetch_mut(world, entity)?;
+        let q2 = unsafe { Q2::fetch(&*world_ptr, entity)? };
+        let q3 = unsafe { Q3::fetch(&*world_ptr, entity)? };
+        Some((q1, q2, q3))
+    }
+
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
+        Box::new(
+            Q1::iter_entities(world)
+                .filter(move |e| Q2::fetch(world, *e).is_some() && Q3::fetch(world, *e).is_some()),
+        )
+    }
+}
+
+impl<Q1: ReadOnlyQueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> ReadOnlyQueryParam
+    for (Q1, Q2, Q3)
+{
+    fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
+        Some((Q1::fetch(world, entity)?, Q2::fetch(world, entity)?, Q3::fetch(world, entity)?))
     }
 }
 
@@ -266,5 +343,35 @@ mod tests {
         }
 
         assert_eq!(world.get_component::<Position>(e).unwrap().y, 5.0);
+    }
+
+    #[test]
+    fn test_with_filter() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        world.insert_component(e1, Position { x: 1.0, y: 1.0 });
+        world.insert_component(e1, Velocity { dx: 0.1, dy: 0.1 });
+
+        let e2 = world.spawn();
+        world.insert_component(e2, Position { x: 2.0, y: 2.0 });
+
+        let results: Vec<_> =
+            world.query::<(&Position, With<Velocity>)>().iter().map(|(pos, _)| pos.x).collect();
+        assert_eq!(results, vec![1.0]);
+    }
+
+    #[test]
+    fn test_without_filter() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        world.insert_component(e1, Position { x: 1.0, y: 1.0 });
+        world.insert_component(e1, Velocity { dx: 0.1, dy: 0.1 });
+
+        let e2 = world.spawn();
+        world.insert_component(e2, Position { x: 2.0, y: 2.0 });
+
+        let results: Vec<_> =
+            world.query::<(&Position, Without<Velocity>)>().iter().map(|(pos, _)| pos.x).collect();
+        assert_eq!(results, vec![2.0]);
     }
 }
