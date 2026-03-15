@@ -74,3 +74,70 @@ impl Default for Schedule {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Tick(usize);
+
+    #[test]
+    fn test_schedule_new_and_empty() {
+        let schedule = Schedule::new();
+        assert!(schedule.is_empty());
+        assert_eq!(schedule.len(), 0);
+
+        let default_schedule = Schedule::default();
+        assert!(default_schedule.is_empty());
+        assert_eq!(default_schedule.len(), 0);
+    }
+
+    #[test]
+    fn test_schedule_add_system() {
+        let mut schedule = Schedule::new();
+        assert!(schedule.is_empty());
+
+        schedule.add_system(into_system(|_world: &mut World| {}));
+        assert!(!schedule.is_empty());
+        assert_eq!(schedule.len(), 1);
+
+        schedule.add_system(into_system(|_world: &mut World| {}));
+        assert_eq!(schedule.len(), 2);
+    }
+
+    #[test]
+    fn test_schedule_run() {
+        let mut world = World::new();
+        world.insert_resource(Tick(0));
+
+        let mut schedule = Schedule::new();
+
+        // System 1: Add 1 to Tick
+        schedule.add_system(into_system(|w: &mut World| {
+            if let Some(tick) = w.get_resource_mut::<Tick>() {
+                tick.0 += 1;
+            }
+        }));
+
+        // System 2: Multiply Tick by 2
+        schedule.add_system(into_system(|w: &mut World| {
+            if let Some(tick) = w.get_resource_mut::<Tick>() {
+                tick.0 *= 2;
+            }
+        }));
+
+        // Run schedule
+        schedule.run(&mut world);
+
+        // Verify result: (0 + 1) * 2 = 2
+        let final_tick = world.get_resource::<Tick>().map_or(0, |t| t.0);
+        assert_eq!(final_tick, 2);
+
+        // Run schedule again
+        schedule.run(&mut world);
+
+        // Verify result: (2 + 1) * 2 = 6
+        let final_tick = world.get_resource::<Tick>().map_or(0, |t| t.0);
+        assert_eq!(final_tick, 6);
+    }
+}
