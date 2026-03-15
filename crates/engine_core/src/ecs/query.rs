@@ -9,11 +9,15 @@ use super::component::Component;
 use super::entity::Entity;
 use super::world::World;
 
+mod private {
+    pub trait Sealed {}
+}
+
 // --- クエリパラメータトレイト ---
 
 /// クエリパラメータとなる型のトレイト。
 /// GAT (Generic Associated Types) を用いて、fetch の結果のライフタイムを 'a に紐づける。
-pub trait QueryParam<'a> {
+pub trait QueryParam<'a>: private::Sealed {
     type Item;
 
     /// 読み取り専用のデータをフェッチする。
@@ -36,6 +40,8 @@ pub trait QueryParam<'a> {
 // --- 読み取り専用クエリの実装 ---
 
 /// 単一 Component への読み取り専用参照
+impl<'a, T: Component> private::Sealed for &'a T {}
+
 impl<'a, T: Component> QueryParam<'a> for &'a T {
     type Item = &'a T;
 
@@ -52,6 +58,8 @@ impl<'a, T: Component> QueryParam<'a> for &'a T {
 }
 
 /// 2つの Component への読み取り専用参照
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, &'a T2) {}
+
 impl<'a, T1: Component, T2: Component> QueryParam<'a> for (&'a T1, &'a T2) {
     type Item = (&'a T1, &'a T2);
 
@@ -79,6 +87,8 @@ impl<'a, T1: Component, T2: Component> QueryParam<'a> for (&'a T1, &'a T2) {
 // --- 可変クエリの実装 ---
 
 /// 単一 Component への可変参照
+impl<'a, T: Component> private::Sealed for &'a mut T {}
+
 impl<'a, T: Component> QueryParam<'a> for &'a mut T {
     type Item = &'a mut T;
 
