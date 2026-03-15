@@ -41,3 +41,108 @@ description: C++ライブラリのRustバインディングを作成・保守す
 - **生ポインタの隠蔽**: パブリックなRust API（公開クレート）に生ポインタや `unsafe` ブロックをそのまま露出させてはならない。
 - **例外の処理**: C++の例外（Exception）はFFIの境界を越えられないため、必ず `bindings.cpp` 側で `try-catch` してエラーコード（列挙型など）に変換してからRustへ返すこと。
 - **命名規則**: Cラッパーの関数名が他のライブラリと衝突しないよう、一貫したプレフィックスを付与すること。
+
+## 📝 実装例 (Example)
+
+### 1. C API Wrapper (`bindings.h` / `bindings.cpp`)
+
+```cpp
+// bindings.h
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void* MyClassHandle;
+
+MyClassHandle my_class_create(int value);
+void my_class_destroy(MyClassHandle handle);
+int my_class_do_something(MyClassHandle handle);
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+```cpp
+// bindings.cpp
+#include "bindings.h"
+#include "my_class.hpp" // C++の元ヘッダ
+
+extern "C" {
+
+MyClassHandle my_class_create(int value) {
+    return new MyClass(value);
+}
+
+void my_class_destroy(MyClassHandle handle) {
+    if (handle) {
+        delete static_cast<MyClass*>(handle);
+    }
+}
+
+int my_class_do_something(MyClassHandle handle) {
+    if (!handle) return -1;
+    try {
+        return static_cast<MyClass*>(handle)->doSomething();
+    } catch (...) {
+        // 例外をキャッチし、適切なエラーコードを返す
+        return -1; 
+    }
+}
+
+}
+```
+
+### 2. Safe Rust Wrapper (`src/lib.rs`)
+
+```rust
+// bindgen で生成された生関数群
+mod ffi {
+    #![allow(non_upper_case_globals, non_camel_case_types, non_snake_case)]
+    // 実際には `include!(concat!(env!("OUT_DIR"), "/bindings.rs"));` などを利用
+    extern "C" {
+        pub type MyClassHandle = *mut std::ffi::c_void;
+        pub fn my_class_create(value: std::os::raw::c_int) -> MyClassHandle;
+        pub fn my_class_destroy(handle: MyClassHandle);
+        pub fn my_class_do_something(handle: MyClassHandle) -> std::os::raw::c_int;
+    }
+}
+
+pub struct MyClass {
+    handle: ffi::MyClassHandle,
+}
+
+// 該当C++インスタンスがスレッドセーフ（共有/移動可能）である保証がある場合のみ実装
+unsafe impl Send for MyClass {}
+unsafe impl Sync for MyClass {}
+
+impl MyClass {
+    pub fn new(value: i32) -> Result<Self, &'static str> {
+        let handle = unsafe { ffi::my_class_create(value) };
+        if handle.is_null() {
+            return Err("Failed to create MyClass instance");
+        }
+        Ok(Self { handle })
+    }
+
+    pub fn do_something(&self) -> Result<i32, &'static str> {
+        let result = unsafe { ffi::my_class_do_something(self.handle) };
+        // エラーコード(-1)をResult型へ変換
+        if result == -1 {
+            Err("An exception occurred in C++ code")
+        } else {
+            Ok(result)
+        }
+    }
+}
+
+impl Drop for MyClass {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe { ffi::my_class_destroy(self.handle) };
+        }
+    }
+}
+```
