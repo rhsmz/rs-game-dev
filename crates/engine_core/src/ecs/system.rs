@@ -74,3 +74,66 @@ impl Default for Schedule {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestResource {
+        counter: i32,
+    }
+
+    #[test]
+    fn test_into_system() {
+        let mut world = World::new();
+        world.insert_resource(TestResource { counter: 0 });
+
+        let mut sys = into_system(|w: &mut World| {
+            let res = w
+                .get_resource_mut::<TestResource>()
+                .expect("TestResource should exist");
+            res.counter += 1;
+        });
+
+        sys.run(&mut world);
+        sys.run(&mut world);
+
+        let res = world
+            .get_resource::<TestResource>()
+            .expect("TestResource should exist");
+        assert_eq!(res.counter, 2);
+    }
+
+    #[test]
+    fn test_into_system_with_captured_state() {
+        let mut world = World::new();
+        world.insert_resource(TestResource { counter: 0 });
+
+        let mut local_counter = 10;
+        let mut sys = into_system(move |w: &mut World| {
+            local_counter += 5;
+            let res = w
+                .get_resource_mut::<TestResource>()
+                .expect("TestResource should exist");
+            res.counter = local_counter;
+        });
+
+        sys.run(&mut world);
+        assert_eq!(
+            world
+                .get_resource::<TestResource>()
+                .expect("TestResource should exist")
+                .counter,
+            15
+        );
+
+        sys.run(&mut world);
+        assert_eq!(
+            world
+                .get_resource::<TestResource>()
+                .expect("TestResource should exist")
+                .counter,
+            20
+        );
+    }
+}
