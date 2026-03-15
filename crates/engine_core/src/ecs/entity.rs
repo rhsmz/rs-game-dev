@@ -124,11 +124,13 @@ mod tests {
     fn test_deallocate_and_reuse() {
         let mut alloc = EntityAllocator::new();
         let e0 = alloc.allocate();
-        let _e1 = alloc.allocate();
+        let e1 = alloc.allocate();
+        assert_eq!(e1.index(), 1);
 
         assert!(alloc.deallocate(e0));
         assert!(!alloc.is_alive(e0));
         assert_eq!(alloc.alive_count(), 1);
+        assert!(alloc.is_alive(e1));
 
         // 再利用: 同じインデックスだが世代が異なる
         let e2 = alloc.allocate();
@@ -136,6 +138,7 @@ mod tests {
         assert_eq!(e2.generation(), 1);
         assert_ne!(e0, e2);
         assert!(alloc.is_alive(e2));
+        assert!(alloc.is_alive(e1));
     }
 
     #[test]
