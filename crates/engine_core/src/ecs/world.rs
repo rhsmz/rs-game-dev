@@ -176,6 +176,33 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_component() {
+        let mut world = World::new();
+        let e = world.spawn();
+
+        world.insert_component(e, Position { x: 10.0, y: 20.0 });
+
+        // 削除して値が返ってくるか確認
+        let removed = world.remove_component::<Position>(e);
+        assert!(removed.is_some());
+        let pos = removed.unwrap();
+        assert!((pos.x - 10.0).abs() < f32::EPSILON);
+
+        // 再度取得しようとしても None
+        assert!(world.get_component::<Position>(e).is_none());
+
+        // 存在しないコンポーネントの削除は None
+        assert!(world.remove_component::<Velocity>(e).is_none());
+
+        // 存在しない Entity からの削除は None
+        let e_none = Entity {
+            index: 999,
+            generation: 0,
+        };
+        assert!(world.remove_component::<Position>(e_none).is_none());
+    }
+
+    #[test]
     fn test_insert_and_get_component() {
         let mut world = World::new();
         let e = world.spawn();
