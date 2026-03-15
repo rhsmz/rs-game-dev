@@ -113,60 +113,149 @@ impl<T: Component> ReadOnlyQueryParam for Without<T> {
     }
 }
 
-/// 汎用タプル 2要素
-impl<Q1: QueryParam, Q2: ReadOnlyQueryParam> private::Sealed for (Q1, Q2) {}
+/// 2つの Component への読み取り専用参照 (2要素タプル)
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, &'a T2) {}
 
-impl<Q1: QueryParam, Q2: ReadOnlyQueryParam> QueryParam for (Q1, Q2) {
-    type Item<'b> = (Q1::Item<'b>, Q2::Item<'b>);
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a T1, &'a T2) {
+    type Item<'b> = (&'b T1, &'b T2);
 
     fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
-        let world_ptr = world as *mut World;
-        let q1 = Q1::fetch_mut(world, entity)?;
-        let q2 = unsafe { Q2::fetch(&*world_ptr, entity)? };
-        Some((q1, q2))
+        // 両方とも読み取り専用なので安全にフェッチ可能
+        Some((world.get_component::<T1>(entity)?, world.get_component::<T2>(entity)?))
     }
 
     fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
-        Box::new(Q1::iter_entities(world).filter(move |e| Q2::fetch(world, *e).is_some()))
+        let s1 = world.get_storage::<T1>();
+        let s2 = world.get_storage::<T2>();
+
+        match (s1, s2) {
+            (Some(s1), Some(s2)) => {
+                if s1.len() <= s2.len() {
+                    Box::new(s1.iter().map(|(e, _)| e).filter(move |e| s2.get(*e).is_some()))
+                } else {
+                    Box::new(s2.iter().map(|(e, _)| e).filter(move |e| s1.get(*e).is_some()))
+                }
+            }
+            _ => Box::new(std::iter::empty()),
+        }
     }
 }
 
-impl<Q1: ReadOnlyQueryParam, Q2: ReadOnlyQueryParam> ReadOnlyQueryParam for (Q1, Q2) {
+impl<'a, T1: Component, T2: Component> ReadOnlyQueryParam for (&'a T1, &'a T2) {
     fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
-        Some((Q1::fetch(world, entity)?, Q2::fetch(world, entity)?))
+        Some((world.get_component::<T1>(entity)?, world.get_component::<T2>(entity)?))
     }
 }
 
-/// 汎用タプル 3要素
-impl<Q1: QueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> private::Sealed
-    for (Q1, Q2, Q3)
-{
-}
+/// データのフェッチ ＋ With フィルタ (読み取り専用)
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, With<T2>) {}
 
-impl<Q1: QueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> QueryParam for (Q1, Q2, Q3) {
-    type Item<'b> = (Q1::Item<'b>, Q2::Item<'b>, Q3::Item<'b>);
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a T1, With<T2>) {
+    type Item<'b> = (&'b T1, ());
 
     fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
-        let world_ptr = world as *mut World;
-        let q1 = Q1::fetch_mut(world, entity)?;
-        let q2 = unsafe { Q2::fetch(&*world_ptr, entity)? };
-        let q3 = unsafe { Q3::fetch(&*world_ptr, entity)? };
-        Some((q1, q2, q3))
+        if world.get_component::<T2>(entity).is_none() {
+            return None;
+        }
+        Some((world.get_component::<T1>(entity)?, ()))
     }
 
     fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
-        Box::new(
-            Q1::iter_entities(world)
-                .filter(move |e| Q2::fetch(world, *e).is_some() && Q3::fetch(world, *e).is_some()),
-        )
+        match world.get_storage::<T1>() {
+            Some(s1) => Box::new(
+                s1.iter().map(|(e, _)| e).filter(move |e| world.get_component::<T2>(*e).is_some()),
+            ),
+            None => Box::new(std::iter::empty()),
+        }
     }
 }
 
-impl<Q1: ReadOnlyQueryParam, Q2: ReadOnlyQueryParam, Q3: ReadOnlyQueryParam> ReadOnlyQueryParam
-    for (Q1, Q2, Q3)
-{
+impl<'a, T1: Component, T2: Component> ReadOnlyQueryParam for (&'a T1, With<T2>) {
     fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
-        Some((Q1::fetch(world, entity)?, Q2::fetch(world, entity)?, Q3::fetch(world, entity)?))
+        if world.get_component::<T2>(entity).is_none() {
+            return None;
+        }
+        Some((world.get_component::<T1>(entity)?, ()))
+    }
+}
+
+/// データのフェッチ ＋ Without フィルタ (読み取り専用)
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, Without<T2>) {}
+
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a T1, Without<T2>) {
+    type Item<'b> = (&'b T1, ());
+
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        if world.get_component::<T2>(entity).is_some() {
+            return None;
+        }
+        Some((world.get_component::<T1>(entity)?, ()))
+    }
+
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
+        match world.get_storage::<T1>() {
+            Some(s1) => Box::new(
+                s1.iter().map(|(e, _)| e).filter(move |e| world.get_component::<T2>(*e).is_none()),
+            ),
+            None => Box::new(std::iter::empty()),
+        }
+    }
+}
+
+impl<'a, T1: Component, T2: Component> ReadOnlyQueryParam for (&'a T1, Without<T2>) {
+    fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
+        if world.get_component::<T2>(entity).is_some() {
+            return None;
+        }
+        Some((world.get_component::<T1>(entity)?, ()))
+    }
+}
+
+/// データの可変フェッチ ＋ With フィルタ
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a mut T1, With<T2>) {}
+
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a mut T1, With<T2>) {
+    type Item<'b> = (&'b mut T1, ());
+
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        if world.get_component::<T2>(entity).is_none() {
+            return None;
+        }
+        let item1 = world.get_storage_mut::<T1>()?.get_mut(entity)?;
+        Some((item1, ()))
+    }
+
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
+        match world.get_storage::<T1>() {
+            Some(s1) => Box::new(
+                s1.iter().map(|(e, _)| e).filter(move |e| world.get_component::<T2>(*e).is_some()),
+            ),
+            None => Box::new(std::iter::empty()),
+        }
+    }
+}
+
+/// データの可変フェッチ ＋ Without フィルタ
+impl<'a, T1: Component, T2: Component> private::Sealed for (&'a mut T1, Without<T2>) {}
+
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a mut T1, Without<T2>) {
+    type Item<'b> = (&'b mut T1, ());
+
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        if world.get_component::<T2>(entity).is_some() {
+            return None;
+        }
+        let item1 = world.get_storage_mut::<T1>()?.get_mut(entity)?;
+        Some((item1, ()))
+    }
+
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
+        match world.get_storage::<T1>() {
+            Some(s1) => Box::new(
+                s1.iter().map(|(e, _)| e).filter(move |e| world.get_component::<T2>(*e).is_none()),
+            ),
+            None => Box::new(std::iter::empty()),
+        }
     }
 }
 
