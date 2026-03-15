@@ -3,14 +3,28 @@
 //! ECS ↔ UI 間のメッセージパッシングに使用する。
 //! フレーム単位でイベントを蓄積し、消費する。
 
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+
+/// 型消去されたイベントキューが実装すべきトレイト。
+#[allow(dead_code)]
+trait AnyEventQueue: Send + Sync {
+    /// キューをクリアする。
+    fn clear(&mut self);
+    /// `Any` への参照を返す。
+    fn as_any(&self) -> &dyn Any;
+    /// `Any` への可変参照を返す。
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
 /// 型付きイベントキュー。
 ///
 /// 1 フレーム内にイベントを蓄積し、消費側が `drain` でまとめて取り出す。
-pub struct EventQueue<T> {
+pub struct EventQueue<T: Send + Sync + 'static> {
     events: Vec<T>,
 }
 
-impl<T> EventQueue<T> {
+impl<T: Send + Sync + 'static> EventQueue<T> {
     /// 新しい空のイベントキューを作成する。
     #[must_use]
     pub fn new() -> Self {
@@ -43,14 +57,70 @@ impl<T> EventQueue<T> {
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
+}
 
-    /// キューをクリアする。
-    pub fn clear(&mut self) {
+impl<T: Send + Sync + 'static> AnyEventQueue for EventQueue<T> {
+    fn clear(&mut self) {
         self.events.clear();
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
-impl<T> Default for EventQueue<T> {
+impl<T: Send + Sync + 'static> Default for EventQueue<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 複数の `EventQueue` を管理するコンテナ。
+pub struct EventQueues {
+    queues: HashMap<TypeId, Box<dyn AnyEventQueue>>,
+}
+
+impl EventQueues {
+    /// 新しい `EventQueues` を作成する。
+    #[must_use]
+    pub fn new() -> Self {
+        Self { queues: HashMap::new() }
+    }
+
+    /// 指定した型のイベントキューを登録する。
+    pub fn register<T: Send + Sync + 'static>(&mut self) {
+        self.queues.entry(TypeId::of::<T>()).or_insert_with(|| Box::new(EventQueue::<T>::new()));
+    }
+
+    /// イベントを送信する。
+    ///
+    /// 対応するキューが存在しない場合は何も起こらない。
+    pub fn send<T: Send + Sync + 'static>(&mut self, event: T) {
+        if let Some(queue) = self.get_mut::<T>() {
+            queue.send(event);
+        }
+    }
+
+    /// 指定した型のイベントキューへの可変参照を取得する。
+    pub fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut EventQueue<T>> {
+        self.queues
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|boxed| boxed.as_any_mut().downcast_mut::<EventQueue<T>>())
+    }
+
+    /// すべてのイベントキューをクリアする。
+    pub fn clear_all(&mut self) {
+        for queue in self.queues.values_mut() {
+            queue.clear();
+        }
+    }
+}
+
+impl Default for EventQueues {
     fn default() -> Self {
         Self::new()
     }
@@ -89,5 +159,38 @@ mod tests {
         queue.send(42);
         queue.clear();
         assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn test_event_queues_send_and_get() {
+        let mut queues = EventQueues::new();
+        queues.register::<i32>();
+        queues.register::<&'static str>();
+
+        queues.send(100);
+        queues.send("event");
+
+        let q1 = queues.get_mut::<i32>().unwrap();
+        assert_eq!(q1.drain().collect::<Vec<_>>(), vec![100]);
+
+        let q2 = queues.get_mut::<&'static str>().unwrap();
+        assert_eq!(q2.drain().collect::<Vec<_>>(), vec!["event"]);
+    }
+
+    #[test]
+    fn test_event_queues_clear_all() {
+        let mut queues = EventQueues::new();
+        queues.register::<i32>();
+        queues.register::<String>();
+
+        queues.send(123);
+        queues.send("hello".to_string());
+
+        queues.clear_all();
+
+        let q1 = queues.get_mut::<i32>().unwrap();
+        assert!(q1.is_empty());
+        let q2 = queues.get_mut::<String>().unwrap();
+        assert!(q2.is_empty());
     }
 }
