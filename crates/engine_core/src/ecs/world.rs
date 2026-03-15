@@ -4,10 +4,17 @@
 
 use std::any::TypeId;
 use std::collections::HashMap;
+use thiserror::Error;
 
 use super::component::{AnyComponentStorage, Component, ComponentStorage};
 use super::entity::{Entity, EntityAllocator};
 use super::resource::Resources;
+
+#[derive(Error, Debug)]
+pub enum ComponentError {
+    #[error("storage type mismatch: failed to downcast component storage")]
+    StorageTypeMismatch,
+}
 
 /// ECS World。Entity・Component・Resource の統合コンテナ。
 pub struct World {
@@ -61,9 +68,10 @@ impl World {
     // ── Component 操作 ──
 
     /// Entity に Component を追加する。
-    pub fn insert_component<T: Component>(&mut self, entity: Entity, component: T) {
-        let storage = self.get_or_create_storage::<T>();
+    pub fn insert_component<T: Component>(&mut self, entity: Entity, component: T) -> Result<(), ComponentError> {
+        let storage = self.get_or_create_storage::<T>()?;
         storage.insert(entity, component);
+        Ok(())
     }
 
     /// Entity の Component を取得する。
@@ -100,7 +108,7 @@ impl World {
     }
 
     /// 指定型の `ComponentStorage` を取得するか、存在しなければ作成する。
-    fn get_or_create_storage<T: Component>(&mut self) -> &mut ComponentStorage<T> {
+    fn get_or_create_storage<T: Component>(&mut self) -> Result<&mut ComponentStorage<T>, ComponentError> {
         self.components
             .entry(TypeId::of::<T>())
             .or_insert_with(|| Box::new(ComponentStorage::<T>::new()));
@@ -108,7 +116,7 @@ impl World {
         self.components
             .get_mut(&TypeId::of::<T>())
             .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>())
-            .expect("storage type mismatch: this should never happen")
+            .ok_or(ComponentError::StorageTypeMismatch)
     }
 
     // ── Resource 操作 ──
@@ -180,8 +188,8 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
 
-        world.insert_component(e, Position { x: 10.0, y: 20.0 });
-        world.insert_component(e, Velocity { dx: 1.0, dy: -1.0 });
+        world.insert_component(e, Position { x: 10.0, y: 20.0 }).unwrap();
+        world.insert_component(e, Velocity { dx: 1.0, dy: -1.0 }).unwrap();
 
         let pos = world.get_component::<Position>(e);
         assert!(pos.is_some());
@@ -196,8 +204,8 @@ mod tests {
     fn test_despawn_removes_all_components() {
         let mut world = World::new();
         let e = world.spawn();
-        world.insert_component(e, Position { x: 1.0, y: 2.0 });
-        world.insert_component(e, Velocity { dx: 0.0, dy: 0.0 });
+        world.insert_component(e, Position { x: 1.0, y: 2.0 }).unwrap();
+        world.insert_component(e, Velocity { dx: 0.0, dy: 0.0 }).unwrap();
 
         world.despawn(e);
         // Component にアクセスしようとしても None
@@ -223,9 +231,9 @@ mod tests {
         let e1 = world.spawn();
         let e2 = world.spawn();
 
-        world.insert_component(e0, Position { x: 0.0, y: 0.0 });
-        world.insert_component(e1, Position { x: 1.0, y: 1.0 });
-        world.insert_component(e2, Position { x: 2.0, y: 2.0 });
+        world.insert_component(e0, Position { x: 0.0, y: 0.0 }).unwrap();
+        world.insert_component(e1, Position { x: 1.0, y: 1.0 }).unwrap();
+        world.insert_component(e2, Position { x: 2.0, y: 2.0 }).unwrap();
 
         let storage = world.get_storage::<Position>();
         assert!(storage.is_some());
