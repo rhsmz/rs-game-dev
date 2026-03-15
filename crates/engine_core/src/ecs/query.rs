@@ -469,7 +469,7 @@ mod tests {
         let e1 = world.spawn();
         world.insert_component(e1, Position { x: 1.0, y: 1.0 });
 
-        let e2 = world.spawn(); // empty
+        let _e2 = world.spawn(); // empty
 
         let count = world.query::<Without<Position>>().iter().count();
         assert_eq!(count, 1);
