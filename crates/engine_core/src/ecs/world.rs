@@ -103,11 +103,9 @@ impl World {
     fn get_or_create_storage<T: Component>(&mut self) -> &mut ComponentStorage<T> {
         self.components
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::new(ComponentStorage::<T>::new()));
-
-        self.components
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>())
+            .or_insert_with(|| Box::new(ComponentStorage::<T>::new()))
+            .as_any_mut()
+            .downcast_mut::<ComponentStorage<T>>()
             .expect("storage type mismatch: this should never happen")
     }
 
