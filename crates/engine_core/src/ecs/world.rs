@@ -37,6 +37,11 @@ impl World {
         self.entities.allocate()
     }
 
+    /// 生存しているすべての Entity のイテレータを返す。
+    pub fn iter_entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.entities.iter()
+    }
+
     /// Entity を破棄し、紐づく全 Component を削除する。
     pub fn despawn(&mut self, entity: Entity) -> bool {
         if !self.entities.deallocate(entity) {

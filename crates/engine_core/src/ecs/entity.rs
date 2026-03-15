@@ -39,6 +39,8 @@ pub struct EntityAllocator {
     generations: Vec<u32>,
     /// 再利用可能なインデックスのリスト
     free_list: Vec<u32>,
+    /// 生存フラグ
+    alive: Vec<bool>,
     /// 現在生存している Entity の数
     alive_count: usize,
 }
@@ -47,7 +49,7 @@ impl EntityAllocator {
     /// 新しい `EntityAllocator` を作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self { generations: Vec::new(), free_list: Vec::new(), alive_count: 0 }
+        Self { generations: Vec::new(), free_list: Vec::new(), alive: Vec::new(), alive_count: 0 }
     }
 
     /// 新しい Entity を割り当てる。
@@ -56,12 +58,14 @@ impl EntityAllocator {
 
         if let Some(index) = self.free_list.pop() {
             // 再利用: deallocate 時に世代はすでにインクリメント済み
+            self.alive[index as usize] = true;
             Entity { index, generation: self.generations[index as usize] }
         } else {
             // 新規割り当て
             let index = u32::try_from(self.generations.len())
                 .expect("Entity index overflow: too many entities allocated");
             self.generations.push(0);
+            self.alive.push(true);
             Entity { index, generation: 0 }
         }
     }
@@ -75,6 +79,7 @@ impl EntityAllocator {
             // 世代をインクリメントして古い参照を無効化
             self.generations[idx] += 1;
             self.free_list.push(entity.index);
+            self.alive[idx] = false;
             self.alive_count -= 1;
             true
         } else {
@@ -93,6 +98,13 @@ impl EntityAllocator {
     #[must_use]
     pub fn alive_count(&self) -> usize {
         self.alive_count
+    }
+
+    /// 生存しているすべての Entity のイテレータを返す。
+    pub fn iter(&self) -> impl Iterator<Item = Entity> + '_ {
+        (0..self.generations.len() as u32)
+            .filter(move |&idx| self.alive[idx as usize])
+            .map(move |idx| Entity { index: idx, generation: self.generations[idx as usize] })
     }
 }
 
