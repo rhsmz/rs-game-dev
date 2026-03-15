@@ -102,8 +102,7 @@ impl<T: Component> QueryParam for Without<T> {
     }
 
     fn iter_entities<'a>(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
-        // Without 単体での全列挙はコストが高いため、基本的には tuple での絞り込みを推奨する
-        Box::new(std::iter::empty())
+        Box::new(world.iter_entities())
     }
 }
 
@@ -462,5 +461,17 @@ mod tests {
         let results: Vec<_> =
             world.query::<(&Position, Without<Velocity>)>().iter().map(|(pos, _)| pos.x).collect();
         assert_eq!(results, vec![2.0]);
+    }
+
+    #[test]
+    fn test_standalone_without() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        world.insert_component(e1, Position { x: 1.0, y: 1.0 });
+
+        let e2 = world.spawn(); // empty
+
+        let count = world.query::<Without<Position>>().iter().count();
+        assert_eq!(count, 1);
     }
 }

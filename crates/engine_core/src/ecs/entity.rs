@@ -94,6 +94,13 @@ impl EntityAllocator {
     pub fn alive_count(&self) -> usize {
         self.alive_count
     }
+
+    /// 生存しているすべての Entity のイテレータを返す。
+    pub fn iter(&self) -> impl Iterator<Item = Entity> + '_ {
+        (0..self.generations.len() as u32)
+            .filter(move |&idx| !self.free_list.contains(&idx))
+            .map(move |idx| Entity { index: idx, generation: self.generations[idx as usize] })
+    }
 }
 
 impl Default for EntityAllocator {
