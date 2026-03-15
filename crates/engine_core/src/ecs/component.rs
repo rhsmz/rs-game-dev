@@ -36,7 +36,7 @@ pub struct ComponentStorage<T: Component> {
 impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { dense: Vec::new(), dense_to_entity: Vec::new(), sparse: Vec::new() }
     }
 
@@ -213,5 +213,54 @@ mod tests {
     fn test_get_nonexistent_returns_none() {
         let storage = ComponentStorage::<Position>::new();
         assert!(storage.get(entity(99, 0)).is_none());
+    }
+
+    #[test]
+    fn test_any_component_storage_remove() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 1.0, y: 1.0 });
+
+        let any_storage: &mut dyn AnyComponentStorage = &mut storage;
+
+        // Remove existing component
+        assert!(any_storage.remove(e));
+
+        // Remove non-existent component
+        assert!(!any_storage.remove(e));
+    }
+
+    #[test]
+    fn test_any_component_storage_contains() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e1 = entity(0, 0);
+        let e2 = entity(1, 0);
+        storage.insert(e1, Position { x: 1.0, y: 1.0 });
+
+        let any_storage: &dyn AnyComponentStorage = &storage;
+
+        assert!(any_storage.contains(e1));
+        assert!(!any_storage.contains(e2));
+    }
+
+    #[test]
+    fn test_any_component_storage_as_any() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 1.0, y: 1.0 });
+
+        let any_storage: &mut dyn AnyComponentStorage = &mut storage;
+
+        // Test as_any
+        let any_ref = any_storage.as_any();
+        let downcasted_ref = any_ref.downcast_ref::<ComponentStorage<Position>>();
+        assert!(downcasted_ref.is_some());
+        assert!(downcasted_ref.unwrap().contains(e));
+
+        // Test as_any_mut
+        let any_mut = any_storage.as_any_mut();
+        let downcasted_mut = any_mut.downcast_mut::<ComponentStorage<Position>>();
+        assert!(downcasted_mut.is_some());
+        assert!(downcasted_mut.unwrap().remove_component(e).is_some());
     }
 }

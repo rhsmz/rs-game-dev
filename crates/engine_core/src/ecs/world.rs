@@ -54,7 +54,7 @@ impl World {
 
     /// 生存している Entity の数を返す。
     #[must_use]
-    pub fn entity_count(&self) -> usize {
+    pub const fn entity_count(&self) -> usize {
         self.entities.alive_count()
     }
 
@@ -91,6 +91,12 @@ impl World {
             .and_then(|boxed| boxed.as_any().downcast_ref::<ComponentStorage<T>>())
     }
 
+    /// Entity が指定された Component を持っているか確認する。
+    #[must_use]
+    pub fn has_component<T: Component>(&self, entity: Entity) -> bool {
+        self.components.get(&TypeId::of::<T>()).is_some_and(|boxed| boxed.contains(entity))
+    }
+
     /// 指定型の `ComponentStorage` を可変参照で取得する。
     #[must_use]
     pub fn get_storage_mut<T: Component>(&mut self) -> Option<&mut ComponentStorage<T>> {
@@ -108,7 +114,7 @@ impl World {
         self.components
             .get_mut(&TypeId::of::<T>())
             .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>())
-            .expect("storage type mismatch: this should never happen")
+            .unwrap_or_else(|| panic!("storage type mismatch: this should never happen"))
     }
 
     // ── Resource 操作 ──

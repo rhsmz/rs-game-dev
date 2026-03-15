@@ -46,11 +46,15 @@ pub struct EntityAllocator {
 impl EntityAllocator {
     /// 新しい `EntityAllocator` を作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { generations: Vec::new(), free_list: Vec::new(), alive_count: 0 }
     }
 
     /// 新しい Entity を割り当てる。
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of allocated entities exceeds `u32::MAX`.
     pub fn allocate(&mut self) -> Entity {
         self.alive_count += 1;
 
@@ -60,7 +64,7 @@ impl EntityAllocator {
         } else {
             // 新規割り当て
             let index = u32::try_from(self.generations.len())
-                .expect("Entity index overflow: too many entities allocated");
+                .unwrap_or_else(|_| panic!("Entity index overflow: too many entities allocated"));
             self.generations.push(0);
             Entity { index, generation: 0 }
         }
@@ -91,7 +95,7 @@ impl EntityAllocator {
 
     /// 現在生存している Entity の数を返す。
     #[must_use]
-    pub fn alive_count(&self) -> usize {
+    pub const fn alive_count(&self) -> usize {
         self.alive_count
     }
 }

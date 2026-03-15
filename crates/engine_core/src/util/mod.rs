@@ -2,10 +2,12 @@
 //!
 //! クレート内で共有されるヘルパー関数・型。
 
+#[allow(dead_code)]
 pub struct UtilHelper;
 
 impl UtilHelper {
-    pub fn new() -> Self {
+    #[allow(dead_code)]
+    pub const fn new() -> Self {
         Self
     }
 }

@@ -5,8 +5,15 @@
 
 pub struct RngManager;
 
+impl Default for RngManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RngManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
