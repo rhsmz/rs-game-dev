@@ -13,7 +13,7 @@ pub struct EventQueue<T> {
 impl<T> EventQueue<T> {
     /// 新しい空のイベントキューを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { events: Vec::new() }
     }
 
@@ -47,6 +47,15 @@ impl<T> EventQueue<T> {
     /// キューをクリアする。
     pub fn clear(&mut self) {
         self.events.clear();
+    }
+}
+
+impl<'a, T> IntoIterator for &'a EventQueue<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

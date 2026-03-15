@@ -6,7 +6,14 @@
 pub struct SaveManager;
 
 impl SaveManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
+    }
+}
+
+impl Default for SaveManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

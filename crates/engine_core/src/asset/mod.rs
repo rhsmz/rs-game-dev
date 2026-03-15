@@ -6,7 +6,14 @@
 pub struct AssetManager;
 
 impl AssetManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
+    }
+}
+
+impl Default for AssetManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

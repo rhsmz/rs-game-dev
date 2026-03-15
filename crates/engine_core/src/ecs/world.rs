@@ -14,6 +14,8 @@ pub struct World {
     entities: EntityAllocator,
     components: HashMap<TypeId, Box<dyn AnyComponentStorage>>,
     resources: Resources,
+    /// Entity ID (index) ごとに保持している Component の `TypeId` を記録
+    entity_components: Vec<Vec<TypeId>>,
 }
 
 impl World {
@@ -24,6 +26,7 @@ impl World {
             entities: EntityAllocator::new(),
             components: HashMap::new(),
             resources: Resources::new(),
+            entity_components: Vec::new(),
         }
     }
 
@@ -39,10 +42,17 @@ impl World {
         if !self.entities.deallocate(entity) {
             return false;
         }
-        // 全ストレージから Component を削除
-        for storage in self.components.values_mut() {
-            storage.remove(entity);
+
+        let idx = entity.index() as usize;
+        if let Some(types) = self.entity_components.get_mut(idx) {
+            // Entity が保持している Component のストレージからのみ削除
+            for type_id in types.drain(..) {
+                if let Some(storage) = self.components.get_mut(&type_id) {
+                    storage.remove(entity);
+                }
+            }
         }
+
         true
     }
 
@@ -54,7 +64,7 @@ impl World {
 
     /// 生存している Entity の数を返す。
     #[must_use]
-    pub fn entity_count(&self) -> usize {
+    pub const fn entity_count(&self) -> usize {
         self.entities.alive_count()
     }
 
@@ -62,6 +72,16 @@ impl World {
 
     /// Entity に Component を追加する。
     pub fn insert_component<T: Component>(&mut self, entity: Entity, component: T) {
+        let type_id = TypeId::of::<T>();
+        let idx = entity.index() as usize;
+
+        if idx >= self.entity_components.len() {
+            self.entity_components.resize_with(idx + 1, Vec::new);
+        }
+        if !self.entity_components[idx].contains(&type_id) {
+            self.entity_components[idx].push(type_id);
+        }
+
         let storage = self.get_or_create_storage::<T>();
         storage.insert(entity, component);
     }
@@ -80,7 +100,18 @@ impl World {
 
     /// Entity の Component を削除する。
     pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
-        self.get_storage_mut::<T>().and_then(|storage| storage.remove_component(entity))
+        let result =
+            self.get_storage_mut::<T>().and_then(|storage| storage.remove_component(entity));
+        if result.is_some() {
+            let type_id = TypeId::of::<T>();
+            let idx = entity.index() as usize;
+            if let Some(components) = self.entity_components.get_mut(idx) {
+                if let Some(pos) = components.iter().position(|&id| id == type_id) {
+                    components.swap_remove(pos);
+                }
+            }
+        }
+        result
     }
 
     /// 指定型の `ComponentStorage` を取得する。
@@ -108,7 +139,7 @@ impl World {
         self.components
             .get_mut(&TypeId::of::<T>())
             .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>())
-            .expect("storage type mismatch: this should never happen")
+            .unwrap_or_else(|| panic!("storage type mismatch: this should never happen"))
     }
 
     // ── Resource 操作 ──

@@ -8,7 +8,14 @@
 pub struct AudioManager;
 
 impl AudioManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
+    }
+}
+
+impl Default for AudioManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

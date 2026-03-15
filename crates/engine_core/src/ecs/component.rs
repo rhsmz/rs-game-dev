@@ -15,8 +15,6 @@ pub trait Component: Any + Send + Sync + 'static {}
 pub(crate) trait AnyComponentStorage: Send + Sync {
     /// Entity に紐づく Component を削除する。
     fn remove(&mut self, entity: Entity) -> bool;
-    /// Entity をストレージが保持しているか確認する。
-    fn contains(&self, entity: Entity) -> bool;
     /// `Any` への参照を返す（ダウンキャスト用）。
     fn as_any(&self) -> &dyn Any;
     /// `Any` への可変参照を返す（ダウンキャスト用）。
@@ -36,7 +34,7 @@ pub struct ComponentStorage<T: Component> {
 impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { dense: Vec::new(), dense_to_entity: Vec::new(), sparse: Vec::new() }
     }
 
@@ -129,11 +127,6 @@ impl<T: Component> Default for ComponentStorage<T> {
 impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
     fn remove(&mut self, entity: Entity) -> bool {
         self.remove_component(entity).is_some()
-    }
-
-    fn contains(&self, entity: Entity) -> bool {
-        let idx = entity.index() as usize;
-        self.sparse.get(idx).and_then(|opt| *opt).is_some()
     }
 
     fn as_any(&self) -> &dyn Any {
