@@ -34,6 +34,7 @@ impl std::fmt::Display for Entity {
 }
 
 /// Entity の割り当てと再利用を管理するアロケータ。
+#[derive(Default)]
 pub struct EntityAllocator {
     /// 各スロットの現在の世代
     generations: Vec<u32>,
@@ -47,7 +48,7 @@ impl EntityAllocator {
     /// 新しい `EntityAllocator` を作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self { generations: Vec::new(), free_list: Vec::new(), alive_count: 0 }
+        Self::default()
     }
 
     /// 新しい Entity を割り当てる。
@@ -93,12 +94,6 @@ impl EntityAllocator {
     #[must_use]
     pub fn alive_count(&self) -> usize {
         self.alive_count
-    }
-}
-
-impl Default for EntityAllocator {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
