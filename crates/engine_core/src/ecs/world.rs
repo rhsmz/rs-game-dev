@@ -30,7 +30,7 @@ impl World {
     // ── Entity 操作 ──
 
     /// 新しい Entity を生成する。
-    pub fn spawn(&mut self) -> Entity {
+    pub fn spawn(&mut self) -> Option<Entity> {
         self.entities.allocate()
     }
 
@@ -163,8 +163,8 @@ mod tests {
     #[test]
     fn test_spawn_and_despawn() {
         let mut world = World::new();
-        let e0 = world.spawn();
-        let e1 = world.spawn();
+        let e0 = world.spawn().expect("Failed to spawn entity");
+        let e1 = world.spawn().expect("Failed to spawn entity");
 
         assert_eq!(world.entity_count(), 2);
         assert!(world.is_alive(e0));
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn test_insert_and_get_component() {
         let mut world = World::new();
-        let e = world.spawn();
+        let e = world.spawn().expect("Failed to spawn entity");
 
         world.insert_component(e, Position { x: 10.0, y: 20.0 });
         world.insert_component(e, Velocity { dx: 1.0, dy: -1.0 });
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_despawn_removes_all_components() {
         let mut world = World::new();
-        let e = world.spawn();
+        let e = world.spawn().expect("Failed to spawn entity");
         world.insert_component(e, Position { x: 1.0, y: 2.0 });
         world.insert_component(e, Velocity { dx: 0.0, dy: 0.0 });
 
@@ -219,9 +219,9 @@ mod tests {
     #[test]
     fn test_component_storage_iterate() {
         let mut world = World::new();
-        let e0 = world.spawn();
-        let e1 = world.spawn();
-        let e2 = world.spawn();
+        let e0 = world.spawn().expect("Failed to spawn entity");
+        let e1 = world.spawn().expect("Failed to spawn entity");
+        let e2 = world.spawn().expect("Failed to spawn entity");
 
         world.insert_component(e0, Position { x: 0.0, y: 0.0 });
         world.insert_component(e1, Position { x: 1.0, y: 1.0 });

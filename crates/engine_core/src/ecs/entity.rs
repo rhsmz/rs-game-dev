@@ -51,18 +51,17 @@ impl EntityAllocator {
     }
 
     /// 新しい Entity を割り当てる。
-    pub fn allocate(&mut self) -> Entity {
-        self.alive_count += 1;
-
+    pub fn allocate(&mut self) -> Option<Entity> {
         if let Some(index) = self.free_list.pop() {
+            self.alive_count += 1;
             // 再利用: deallocate 時に世代はすでにインクリメント済み
-            Entity { index, generation: self.generations[index as usize] }
+            Some(Entity { index, generation: self.generations[index as usize] })
         } else {
             // 新規割り当て
-            let index = u32::try_from(self.generations.len())
-                .expect("Entity index overflow: too many entities allocated");
+            let index = u32::try_from(self.generations.len()).ok()?;
+            self.alive_count += 1;
             self.generations.push(0);
-            Entity { index, generation: 0 }
+            Some(Entity { index, generation: 0 })
         }
     }
 
@@ -109,9 +108,9 @@ mod tests {
     #[test]
     fn test_allocate_sequential_entities() {
         let mut alloc = EntityAllocator::new();
-        let e0 = alloc.allocate();
-        let e1 = alloc.allocate();
-        let e2 = alloc.allocate();
+        let e0 = alloc.allocate().expect("Failed to allocate entity");
+        let e1 = alloc.allocate().expect("Failed to allocate entity");
+        let e2 = alloc.allocate().expect("Failed to allocate entity");
 
         assert_eq!(e0.index(), 0);
         assert_eq!(e1.index(), 1);
@@ -123,15 +122,15 @@ mod tests {
     #[test]
     fn test_deallocate_and_reuse() {
         let mut alloc = EntityAllocator::new();
-        let e0 = alloc.allocate();
-        let _e1 = alloc.allocate();
+        let e0 = alloc.allocate().expect("Failed to allocate entity");
+        let _e1 = alloc.allocate().expect("Failed to allocate entity");
 
         assert!(alloc.deallocate(e0));
         assert!(!alloc.is_alive(e0));
         assert_eq!(alloc.alive_count(), 1);
 
         // 再利用: 同じインデックスだが世代が異なる
-        let e2 = alloc.allocate();
+        let e2 = alloc.allocate().expect("Failed to allocate entity");
         assert_eq!(e2.index(), 0);
         assert_eq!(e2.generation(), 1);
         assert_ne!(e0, e2);
@@ -141,7 +140,7 @@ mod tests {
     #[test]
     fn test_double_deallocate_returns_false() {
         let mut alloc = EntityAllocator::new();
-        let e0 = alloc.allocate();
+        let e0 = alloc.allocate().expect("Failed to allocate entity");
         assert!(alloc.deallocate(e0));
         assert!(!alloc.deallocate(e0));
     }
@@ -149,13 +148,13 @@ mod tests {
     #[test]
     fn test_is_alive_detects_stale_reference() {
         let mut alloc = EntityAllocator::new();
-        let e0 = alloc.allocate();
+        let e0 = alloc.allocate().expect("Failed to allocate entity");
         assert!(alloc.is_alive(e0));
 
         alloc.deallocate(e0);
         assert!(!alloc.is_alive(e0));
 
-        let e1 = alloc.allocate();
+        let e1 = alloc.allocate().expect("Failed to allocate entity");
         // 古い参照はまだ無効
         assert!(!alloc.is_alive(e0));
         // 新しい参照は有効
