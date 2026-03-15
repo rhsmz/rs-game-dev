@@ -167,4 +167,65 @@ mod tests {
         let e = Entity { index: 42, generation: 3 };
         assert_eq!(format!("{e}"), "Entity(42v3)");
     }
+
+    #[test]
+    fn test_bulk_allocate_and_deallocate() {
+        let mut alloc = EntityAllocator::new();
+        let mut entities = Vec::new();
+        let count = 10_000;
+
+        // Allocate a large number of entities
+        for _ in 0..count {
+            entities.push(alloc.allocate());
+        }
+
+        assert_eq!(alloc.alive_count(), count);
+        assert_eq!(alloc.generations.len(), count);
+        assert!(alloc.free_list.is_empty());
+
+        // Deallocate all entities
+        for entity in &entities {
+            assert!(alloc.deallocate(*entity));
+        }
+
+        assert_eq!(alloc.alive_count(), 0);
+        assert_eq!(alloc.free_list.len(), count);
+
+        // Reallocate again to ensure reuse works seamlessly in bulk
+        let mut new_entities = Vec::new();
+        for _ in 0..count {
+            new_entities.push(alloc.allocate());
+        }
+
+        assert_eq!(alloc.alive_count(), count);
+        assert!(alloc.free_list.is_empty());
+
+        // Verify that indices were reused and generation incremented
+        for entity in &new_entities {
+            assert!(
+                (entity.index() as usize) < count,
+                "Entity index should be reused"
+            );
+            assert_eq!(entity.generation(), 1, "Reused entity generation should be 1");
+        }
+    }
+
+    #[test]
+    fn test_generation_increment_multiple_times() {
+        let mut alloc = EntityAllocator::new();
+
+        let mut current_entity = alloc.allocate();
+        assert_eq!(current_entity.index(), 0);
+        assert_eq!(current_entity.generation(), 0);
+
+        for expected_generation in 1..=10 {
+            assert!(alloc.deallocate(current_entity));
+
+            // Re-allocate the same index (since it's the only one in free list)
+            current_entity = alloc.allocate();
+
+            assert_eq!(current_entity.index(), 0);
+            assert_eq!(current_entity.generation(), expected_generation);
+        }
+    }
 }
