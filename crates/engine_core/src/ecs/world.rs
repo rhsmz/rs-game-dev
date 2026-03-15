@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use super::component::{AnyComponentStorage, Component, ComponentStorage};
 use super::entity::{Entity, EntityAllocator};
+use super::event::{EventQueue, EventQueues};
 use super::resource::Resources;
 
 /// ECS World。Entity・Component・Resource の統合コンテナ。
@@ -14,6 +15,7 @@ pub struct World {
     entities: EntityAllocator,
     components: HashMap<TypeId, Box<dyn AnyComponentStorage>>,
     resources: Resources,
+    events: EventQueues,
 }
 
 impl World {
@@ -24,6 +26,7 @@ impl World {
             entities: EntityAllocator::new(),
             components: HashMap::new(),
             resources: Resources::new(),
+            events: EventQueues::new(),
         }
     }
 
@@ -134,6 +137,29 @@ impl World {
     pub fn remove_resource<T: Send + Sync + 'static>(&mut self) -> Option<T> {
         self.resources.remove::<T>()
     }
+
+    // ── Event 操作 ──
+
+    /// 指定した型のイベントキューを登録する。
+    pub fn register_event<T: Send + Sync + 'static>(&mut self) {
+        self.events.register::<T>();
+    }
+
+    /// イベントを送信する。
+    pub fn send_event<T: Send + Sync + 'static>(&mut self, event: T) {
+        self.events.send(event);
+    }
+
+    /// イベントキューへの可変参照を取得する。
+    #[must_use]
+    pub fn get_event_queue_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut EventQueue<T>> {
+        self.events.get_mut::<T>()
+    }
+
+    /// すべてのイベントキューをクリアする。
+    pub fn clear_all_events(&mut self) {
+        self.events.clear_all();
+    }
 }
 
 impl Default for World {
@@ -159,6 +185,7 @@ mod tests {
     impl Component for Velocity {}
 
     struct GameTime(f64);
+    struct PlayerDeath;
 
     #[test]
     fn test_spawn_and_despawn() {
@@ -183,13 +210,13 @@ mod tests {
         world.insert_component(e, Position { x: 10.0, y: 20.0 });
         world.insert_component(e, Velocity { dx: 1.0, dy: -1.0 });
 
-        let pos = world.get_component::<Position>(e);
-        assert!(pos.is_some());
-        assert!((pos.unwrap().x - 10.0).abs() < f32::EPSILON);
+        let pos = world.get_component::<Position>(e).unwrap();
+        assert!((pos.x - 10.0).abs() < f32::EPSILON);
+        assert!((pos.y - 20.0).abs() < f32::EPSILON);
 
-        let vel = world.get_component::<Velocity>(e);
-        assert!(vel.is_some());
-        assert!((vel.unwrap().dx - 1.0).abs() < f32::EPSILON);
+        let vel = world.get_component::<Velocity>(e).unwrap();
+        assert!((vel.dx - 1.0).abs() < f32::EPSILON);
+        assert!((vel.dy - -1.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -230,5 +257,23 @@ mod tests {
         let storage = world.get_storage::<Position>();
         assert!(storage.is_some());
         assert_eq!(storage.unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_event_system() {
+        let mut world = World::new();
+        world.register_event::<PlayerDeath>();
+
+        world.send_event(PlayerDeath);
+
+        let queue = world.get_event_queue_mut::<PlayerDeath>().unwrap();
+        assert_eq!(queue.drain().count(), 1);
+
+        // クリア後にキューが空になるか
+        world.send_event(PlayerDeath);
+        world.send_event(PlayerDeath);
+        world.clear_all_events();
+        let queue_after_clear = world.get_event_queue_mut::<PlayerDeath>().unwrap();
+        assert!(queue_after_clear.is_empty());
     }
 }

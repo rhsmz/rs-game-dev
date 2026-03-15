@@ -12,6 +12,7 @@ use std::any::Any;
 pub trait Component: Any + Send + Sync + 'static {}
 
 /// 型消去された Component ストレージのインターフェース。
+#[allow(dead_code)]
 pub(crate) trait AnyComponentStorage: Send + Sync {
     /// Entity に紐づく Component を削除する。
     fn remove(&mut self, entity: Entity) -> bool;
@@ -21,6 +22,8 @@ pub(crate) trait AnyComponentStorage: Send + Sync {
     fn as_any(&self) -> &dyn Any;
     /// `Any` への可変参照を返す（ダウンキャスト用）。
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// ストレージ内の変更フラグをすべてクリアする。
+    fn clear_changed_flags(&mut self);
 }
 
 /// `SparseSet` ベースの型付き Component ストレージ。
@@ -31,13 +34,20 @@ pub struct ComponentStorage<T: Component> {
     dense_to_entity: Vec<Entity>,
     /// Entity index → dense インデックスのマッピング (疎配列)
     sparse: Vec<Option<usize>>,
+    /// 変更フラグ (dense と同じ順序)
+    changed: Vec<bool>,
 }
 
 impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
     pub fn new() -> Self {
-        Self { dense: Vec::new(), dense_to_entity: Vec::new(), sparse: Vec::new() }
+        Self {
+            dense: Vec::new(),
+            dense_to_entity: Vec::new(),
+            sparse: Vec::new(),
+            changed: Vec::new(),
+        }
     }
 
     /// Entity に Component を挿入する。既存の値は上書きされる。
@@ -52,12 +62,14 @@ impl<T: Component> ComponentStorage<T> {
         if let Some(dense_idx) = self.sparse[idx] {
             // 既存値を上書き
             self.dense[dense_idx] = component;
+            self.changed[dense_idx] = true;
         } else {
             // 新規挿入
             let dense_idx = self.dense.len();
             self.dense.push(component);
             self.dense_to_entity.push(entity);
             self.sparse[idx] = Some(dense_idx);
+            self.changed.push(true);
         }
     }
 
@@ -69,10 +81,15 @@ impl<T: Component> ComponentStorage<T> {
     }
 
     /// Entity の Component を可変参照で取得する。
+    ///
+    /// 可変参照を取得すると、この Component は「変更済み」としてマークされる。
     #[must_use]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
         let idx = entity.index() as usize;
-        self.sparse.get(idx).copied().flatten().map(|dense_idx| &mut self.dense[dense_idx])
+        self.sparse.get(idx).copied().flatten().map(|dense_idx| {
+            self.changed[dense_idx] = true;
+            &mut self.dense[dense_idx]
+        })
     }
 
     /// Entity の Component を削除する。
@@ -88,9 +105,11 @@ impl<T: Component> ComponentStorage<T> {
                 let moved_entity = self.dense_to_entity[last_dense];
                 self.sparse[moved_entity.index() as usize] = Some(dense_idx);
                 self.dense_to_entity[dense_idx] = moved_entity;
+                self.changed[dense_idx] = self.changed[last_dense];
             }
 
             self.dense_to_entity.pop();
+            self.changed.pop();
             Some(self.dense.swap_remove(dense_idx))
         } else {
             None
@@ -103,8 +122,27 @@ impl<T: Component> ComponentStorage<T> {
     }
 
     /// ストレージ内の全 Entity と Component を可変参照でイテレートする。
+    ///
+    /// このイテレータから取得した Component はすべて「変更済み」としてマークされる。
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
+        for flag in &mut self.changed {
+            *flag = true;
+        }
         self.dense_to_entity.iter().copied().zip(self.dense.iter_mut())
+    }
+
+    /// 「変更済み」とマークされた Entity と Component のみイテレートする。
+    pub fn iter_changed(&self) -> impl Iterator<Item = (Entity, &T)> {
+        self.dense.iter().enumerate().filter_map(|(i, comp)| {
+            if self.changed[i] { Some((self.dense_to_entity[i], comp)) } else { None }
+        })
+    }
+
+    /// ストレージ内の変更フラグをすべてクリアする。
+    pub fn clear_changed_flags(&mut self) {
+        for flag in &mut self.changed {
+            *flag = false;
+        }
     }
 
     /// ストレージ内の Component 数を返す。
@@ -143,12 +181,17 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn clear_changed_flags(&mut self) {
+        ComponentStorage::clear_changed_flags(self);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[derive(Debug, PartialEq)]
     struct Position {
         x: f32,
         y: f32,
@@ -213,5 +256,70 @@ mod tests {
     fn test_get_nonexistent_returns_none() {
         let storage = ComponentStorage::<Position>::new();
         assert!(storage.get(entity(99, 0)).is_none());
+    }
+
+    #[test]
+    fn test_change_detection_on_insert() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 0.0, y: 0.0 });
+
+        let changed: Vec<_> = storage.iter_changed().collect();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].0, e);
+    }
+
+    #[test]
+    fn test_change_detection_on_get_mut() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 0.0, y: 0.0 });
+        storage.clear_changed_flags();
+
+        // get_mut を呼ぶと変更フラグが立つ
+        storage.get_mut(e).unwrap().x = 1.0;
+
+        let changed: Vec<_> = storage.iter_changed().collect();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].1.x, 1.0);
+    }
+
+    #[test]
+    fn test_clear_changed_flags() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e = entity(0, 0);
+        storage.insert(e, Position { x: 0.0, y: 0.0 });
+
+        storage.clear_changed_flags();
+        assert_eq!(storage.iter_changed().count(), 0);
+    }
+
+    #[test]
+    fn test_iter_mut_marks_all_as_changed() {
+        let mut storage = ComponentStorage::<Position>::new();
+        storage.insert(entity(0, 0), Position { x: 1.0, y: 1.0 });
+        storage.insert(entity(1, 0), Position { x: 2.0, y: 2.0 });
+        storage.clear_changed_flags();
+
+        storage.iter_mut().for_each(|(_, pos)| pos.x += 10.0);
+
+        assert_eq!(storage.iter_changed().count(), 2);
+    }
+
+    #[test]
+    fn test_remove_preserves_changed_flag_of_swapped_element() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let e0 = entity(0, 0);
+        let e1 = entity(1, 0);
+        storage.insert(e0, Position { x: 1.0, y: 1.0 }); // changed: true
+        storage.insert(e1, Position { x: 2.0, y: 2.0 }); // changed: true
+        storage.clear_changed_flags(); // e0: false, e1: false
+
+        let _ = storage.get_mut(e1); // e0: false, e1: true
+        storage.remove_component(e0); // e1 が e0 の位置に移動
+
+        let items: Vec<_> = storage.iter_changed().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].0, e1);
     }
 }
