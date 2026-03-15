@@ -16,25 +16,21 @@ mod private {
 // --- クエリパラメータトレイト ---
 
 /// クエリパラメータとなる型のトレイト。
-/// GAT (Generic Associated Types) を用いて、fetch の結果のライフタイムを 'a に紐づける。
-pub trait QueryParam<'a>: private::Sealed {
-    type Item;
-
-    /// 読み取り専用のデータをフェッチする。
-    fn fetch(world: &'a World, entity: Entity) -> Option<Self::Item>;
+pub trait QueryParam: private::Sealed {
+    type Item<'a>;
 
     /// 可変のデータをフェッチする。
-    fn fetch_mut(world: &'a mut World, entity: Entity) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
-        // デフォルトでは読み取り専用として動作
-        Self::fetch(world, entity)
-    }
+    fn fetch_mut<'a>(world: &'a mut World, entity: Entity) -> Option<Self::Item<'a>>;
 
     /// クエリ対象となる Entity のイテレータを返す。
     /// 最も効率的な ComponentStorage を選択してイテレートする戦略を担う。
-    fn iter_entities(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a>;
+    fn iter_entities<'a>(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a>;
+}
+
+/// 読み取り専用のクエリパラメータを表すトレイト。
+pub trait ReadOnlyQueryParam: QueryParam {
+    /// 読み取り専用のデータをフェッチする。
+    fn fetch<'a>(world: &'a World, entity: Entity) -> Option<Self::Item<'a>>;
 }
 
 // --- 読み取り専用クエリの実装 ---
@@ -42,14 +38,14 @@ pub trait QueryParam<'a>: private::Sealed {
 /// 単一 Component への読み取り専用参照
 impl<'a, T: Component> private::Sealed for &'a T {}
 
-impl<'a, T: Component> QueryParam<'a> for &'a T {
-    type Item = &'a T;
+impl<'a, T: Component> QueryParam for &'a T {
+    type Item<'b> = &'b T;
 
-    fn fetch(world: &'a World, entity: Entity) -> Option<Self::Item> {
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
         world.get_storage::<T>()?.get(entity)
     }
 
-    fn iter_entities(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
         match world.get_storage::<T>() {
             Some(storage) => Box::new(storage.iter().map(|(e, _)| e)),
             None => Box::new(std::iter::empty()),
@@ -57,17 +53,24 @@ impl<'a, T: Component> QueryParam<'a> for &'a T {
     }
 }
 
+impl<'a, T: Component> ReadOnlyQueryParam for &'a T {
+    fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
+        world.get_storage::<T>()?.get(entity)
+    }
+}
+
 /// 2つの Component への読み取り専用参照
 impl<'a, T1: Component, T2: Component> private::Sealed for (&'a T1, &'a T2) {}
 
-impl<'a, T1: Component, T2: Component> QueryParam<'a> for (&'a T1, &'a T2) {
-    type Item = (&'a T1, &'a T2);
+impl<'a, T1: Component, T2: Component> QueryParam for (&'a T1, &'a T2) {
+    type Item<'b> = (&'b T1, &'b T2);
 
-    fn fetch(world: &'a World, entity: Entity) -> Option<Self::Item> {
-        Some((world.get_component::<T1>(entity)?, world.get_component::<T2>(entity)?))
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
+        let s2_comp = world.get_component::<T2>(entity)?;
+        Some((world.get_component::<T1>(entity)?, s2_comp))
     }
 
-    fn iter_entities(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
         let s1 = world.get_storage::<T1>();
         let s2 = world.get_storage::<T2>();
 
@@ -84,24 +87,25 @@ impl<'a, T1: Component, T2: Component> QueryParam<'a> for (&'a T1, &'a T2) {
     }
 }
 
+impl<'a, T1: Component, T2: Component> ReadOnlyQueryParam for (&'a T1, &'a T2) {
+    fn fetch<'b>(world: &'b World, entity: Entity) -> Option<Self::Item<'b>> {
+        Some((world.get_component::<T1>(entity)?, world.get_component::<T2>(entity)?))
+    }
+}
+
 // --- 可変クエリの実装 ---
 
 /// 単一 Component への可変参照
 impl<'a, T: Component> private::Sealed for &'a mut T {}
 
-impl<'a, T: Component> QueryParam<'a> for &'a mut T {
-    type Item = &'a mut T;
+impl<'a, T: Component> QueryParam for &'a mut T {
+    type Item<'b> = &'b mut T;
 
-    fn fetch(_world: &'a World, _entity: Entity) -> Option<Self::Item> {
-        // 可変参照を &World からは取得できない
-        panic!("Cannot fetch mutable data from an immutable world reference.");
-    }
-
-    fn fetch_mut(world: &'a mut World, entity: Entity) -> Option<Self::Item> {
+    fn fetch_mut<'b>(world: &'b mut World, entity: Entity) -> Option<Self::Item<'b>> {
         world.get_storage_mut::<T>()?.get_mut(entity)
     }
 
-    fn iter_entities(world: &'a World) -> Box<dyn Iterator<Item = Entity> + 'a> {
+    fn iter_entities<'b>(world: &'b World) -> Box<dyn Iterator<Item = Entity> + 'b> {
         match world.get_storage::<T>() {
             Some(storage) => Box::new(storage.iter().map(|(e, _)| e)),
             None => Box::new(std::iter::empty()),
@@ -112,64 +116,57 @@ impl<'a, T: Component> QueryParam<'a> for &'a mut T {
 // --- クエリ実行オブジェクト ---
 
 /// クエリ実行オブジェクト。
-pub struct Query<'w, Q: QueryParam<'w>> {
+pub struct Query<'w, Q: ReadOnlyQueryParam> {
     world: &'w World,
     _marker: PhantomData<Q>,
 }
 
-pub struct QueryMut<'w, Q: QueryParam<'w>> {
+pub struct QueryMut<'w, Q: QueryParam> {
     world: &'w mut World,
     _marker: PhantomData<Q>,
 }
 
-impl<'w, Q: QueryParam<'w>> Query<'w, Q> {
+impl<'w, Q: ReadOnlyQueryParam> Query<'w, Q> {
     pub fn new(world: &'w World) -> Self {
         Self { world, _marker: PhantomData }
     }
 
     /// クエリにマッチする Entity と Component のイテレータを返す。
-    pub fn iter(&self) -> impl Iterator<Item = Q::Item> + 'w {
+    pub fn iter(&self) -> impl Iterator<Item = Q::Item<'w>> + 'w {
         Q::iter_entities(self.world).filter_map(|entity| Q::fetch(self.world, entity))
     }
 
     /// 指定した Entity に対してクエリを実行する。
-    pub fn get(&self, entity: Entity) -> Option<Q::Item> {
+    pub fn get(&self, entity: Entity) -> Option<Q::Item<'w>> {
         Q::fetch(self.world, entity)
     }
 }
 
-impl<'w, Q: QueryParam<'w>> QueryMut<'w, Q> {
+impl<'w, Q: QueryParam> QueryMut<'w, Q> {
     pub fn new(world: &'w mut World) -> Self {
         Self { world, _marker: PhantomData }
     }
 
     /// クエリにマッチする Entity と Component の可変イテレータを返す。
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = Q::Item> + 'w {
+    pub fn iter_mut<'b>(&'b mut self) -> impl Iterator<Item = Q::Item<'b>> + 'b {
         // SAFETY:
         // `iter_mut` は `&mut self` を借用するが、内部で `World` への不変参照と可変参照の両方が必要になる。
-        // 1. `Q::iter_entities` でエンティティリストを収集 (不変参照)
-        // 2. `Q::fetch_mut` で各エンティティのコンポーネントをフェッチ (可変参照)
-        // このパターンは Rust の借用チェッカーでは安全だと証明できないため、`unsafe` と生ポインタを使用する。
         let world_ptr = self.world as *mut World;
 
         // まず、生ポインタから不変参照を作成し、エンティティを収集する。
-        // この参照のライフタイムはこの `let` 文に限定される。
         let entities: Vec<Entity> = unsafe { Q::iter_entities(&*world_ptr).collect() };
 
         // 次に、収集したエンティティをイテレートし、クロージャ内で生ポインタから可変参照を作成する。
-        // クロージャは `self` ではなく `world_ptr` のみをキャプチャするため、借用チェッカーの問題を回避できる。
         entities.into_iter().filter_map(move |entity| {
             // この可変参照は `fetch_mut` の呼び出し中のみ有効。
-            // エンティティは一意であるため、エイリアスとなる可変参照は作成されない。
             unsafe { Q::fetch_mut(&mut *world_ptr, entity) }
         })
     }
 
     /// 指定した Entity に対して可変クエリを実行する。
-    pub fn get_mut(&mut self, entity: Entity) -> Option<Q::Item> {
+    pub fn get_mut<'b>(&'b mut self, entity: Entity) -> Option<Q::Item<'b>> {
         // SAFETY: `iter_mut` と同様の理由で unsafe が必要。
-        // `&mut self` のライフタイムは `'w` より短いが、`QueryMut` が存在する限り
-        // `world` は有効であり、返される参照もその範囲でのみ有効となるため安全。
+        // `&mut self` から引き上げた world_ptr を使うことで、借用期間をこの関数呼び出しの生存期間に限定する。
         let world_ptr = self.world as *mut World;
         unsafe { Q::fetch_mut(&mut *world_ptr, entity) }
     }
@@ -177,15 +174,15 @@ impl<'w, Q: QueryParam<'w>> QueryMut<'w, Q> {
 
 /// World のための Query 拡張メソッド
 pub trait WorldQueryExt {
-    fn query<'w, Q: QueryParam<'w>>(&'w self) -> Query<'w, Q>;
-    fn query_mut<'w, Q: QueryParam<'w>>(&'w mut self) -> QueryMut<'w, Q>;
+    fn query<'w, Q: ReadOnlyQueryParam>(&'w self) -> Query<'w, Q>;
+    fn query_mut<'w, Q: QueryParam>(&'w mut self) -> QueryMut<'w, Q>;
 }
 
 impl WorldQueryExt for World {
-    fn query<'w, Q: QueryParam<'w>>(&'w self) -> Query<'w, Q> {
+    fn query<'w, Q: ReadOnlyQueryParam>(&'w self) -> Query<'w, Q> {
         Query::new(self)
     }
-    fn query_mut<'w, Q: QueryParam<'w>>(&'w mut self) -> QueryMut<'w, Q> {
+    fn query_mut<'w, Q: QueryParam>(&'w mut self) -> QueryMut<'w, Q> {
         QueryMut::new(self)
     }
 }
