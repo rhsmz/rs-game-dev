@@ -160,6 +160,22 @@ mod tests {
 
     struct GameTime(f64);
 
+    macro_rules! assert_f32_eq {
+        ($a:expr, $b:expr) => {{
+            let a = $a;
+            let b = $b;
+            assert!((a - b).abs() <= f32::EPSILON * f32::max(1.0, f32::max(a.abs(), b.abs())));
+        }};
+    }
+
+    macro_rules! assert_f64_eq {
+        ($a:expr, $b:expr) => {{
+            let a = $a;
+            let b = $b;
+            assert!((a - b).abs() <= f64::EPSILON * f64::max(1.0, f64::max(a.abs(), b.abs())));
+        }};
+    }
+
     #[test]
     fn test_spawn_and_despawn() {
         let mut world = World::new();
@@ -183,13 +199,13 @@ mod tests {
         world.insert_component(e, Position { x: 10.0, y: 20.0 });
         world.insert_component(e, Velocity { dx: 1.0, dy: -1.0 });
 
-        let pos = world.get_component::<Position>(e);
-        assert!(pos.is_some());
-        assert!((pos.unwrap().x - 10.0).abs() < f32::EPSILON);
+        let pos = world.get_component::<Position>(e).expect("Position component should exist");
+        assert_f32_eq!(pos.x, 10.0);
+        assert_f32_eq!(pos.y, 20.0);
 
-        let vel = world.get_component::<Velocity>(e);
-        assert!(vel.is_some());
-        assert!((vel.unwrap().dx - 1.0).abs() < f32::EPSILON);
+        let vel = world.get_component::<Velocity>(e).expect("Velocity component should exist");
+        assert_f32_eq!(vel.dx, 1.0);
+        assert_f32_eq!(vel.dy, -1.0);
     }
 
     #[test]
@@ -210,10 +226,12 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(GameTime(0.0));
 
-        assert!((world.get_resource::<GameTime>().unwrap().0 - 0.0).abs() < f64::EPSILON);
+        let time = world.get_resource::<GameTime>().expect("GameTime resource should exist");
+        assert_f64_eq!(time.0, 0.0);
 
-        world.get_resource_mut::<GameTime>().unwrap().0 += 0.016;
-        assert!((world.get_resource::<GameTime>().unwrap().0 - 0.016).abs() < f64::EPSILON);
+        world.get_resource_mut::<GameTime>().expect("GameTime resource should exist").0 += 0.016;
+        let time_after = world.get_resource::<GameTime>().expect("GameTime resource should exist");
+        assert_f64_eq!(time_after.0, 0.016);
     }
 
     #[test]

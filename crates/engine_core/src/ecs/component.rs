@@ -159,17 +159,23 @@ mod tests {
         Entity { index, generation }
     }
 
+    macro_rules! assert_f32_eq {
+        ($a:expr, $b:expr) => {{
+            let a = $a;
+            let b = $b;
+            assert!((a - b).abs() <= f32::EPSILON * f32::max(1.0, f32::max(a.abs(), b.abs())));
+        }};
+    }
+
     #[test]
     fn test_insert_and_get() {
         let mut storage = ComponentStorage::<Position>::new();
         let e = entity(0, 0);
         storage.insert(e, Position { x: 1.0, y: 2.0 });
 
-        let pos = storage.get(e);
-        assert!(pos.is_some());
-        let pos = pos.unwrap();
-        assert!((pos.x - 1.0).abs() < f32::EPSILON);
-        assert!((pos.y - 2.0).abs() < f32::EPSILON);
+        let pos = storage.get(e).expect("Position component should exist");
+        assert_f32_eq!(pos.x, 1.0);
+        assert_f32_eq!(pos.y, 2.0);
     }
 
     #[test]
@@ -179,8 +185,8 @@ mod tests {
         storage.insert(e, Position { x: 1.0, y: 2.0 });
         storage.insert(e, Position { x: 3.0, y: 4.0 });
 
-        let pos = storage.get(e).unwrap();
-        assert!((pos.x - 3.0).abs() < f32::EPSILON);
+        let pos = storage.get(e).expect("Position component should exist");
+        assert_f32_eq!(pos.x, 3.0);
         assert_eq!(storage.len(), 1);
     }
 
