@@ -6,10 +6,10 @@
 struct GamePlayerApp;
 
 impl GamePlayerApp {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self
     }
-    fn run(&mut self) {
+    fn run() {
         log::info!("running main loop...");
     }
 }
@@ -17,6 +17,6 @@ impl GamePlayerApp {
 fn main() {
     env_logger::init();
     log::info!("Game Player starting...");
-    let mut app = GamePlayerApp::new();
-    app.run();
+    let _app = GamePlayerApp::new();
+    GamePlayerApp::run();
 }

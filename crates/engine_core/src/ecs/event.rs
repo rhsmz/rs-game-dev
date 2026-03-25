@@ -24,10 +24,82 @@ pub struct EventQueue<T: Send + Sync + 'static> {
     events: Vec<T>,
 }
 
+/// `World::get_event_writer<T>()` が返すハンドル。
+pub struct EventWriter<'a, T: Send + Sync + 'static> {
+    queue: &'a mut EventQueue<T>,
+}
+
+impl<T: Send + Sync + 'static> EventWriter<'_, T> {
+    #[allow(clippy::elidable_lifetime_names)]
+    pub(crate) const fn new<'a>(queue: &'a mut EventQueue<T>) -> EventWriter<'a, T> {
+        EventWriter { queue }
+    }
+
+    /// イベントを送信（キューに追加）。
+    pub fn send(&mut self, event: T) {
+        self.queue.send(event);
+    }
+
+    /// 現在キューに溜まっているイベント数。
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// キューが空かどうか。
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+}
+
+/// `World::get_event_reader<T>()` が返すハンドル。
+pub struct EventReader<'a, T: Send + Sync + 'static> {
+    queue: &'a mut EventQueue<T>,
+}
+
+impl<T: Send + Sync + 'static> EventReader<'_, T> {
+    #[allow(clippy::elidable_lifetime_names)]
+    pub(crate) const fn new<'a>(queue: &'a mut EventQueue<T>) -> EventReader<'a, T> {
+        EventReader { queue }
+    }
+
+    /// 蓄積されたイベントをすべて取り出す。キューは空になる。
+    pub fn drain(&mut self) -> std::vec::Drain<'_, T> {
+        self.queue.drain()
+    }
+
+    /// 蓄積されたイベントを参照する（消費しない）。
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.queue.iter()
+    }
+
+    /// 現在キューに溜まっているイベント数。
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// キューが空かどうか。
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+}
+
+impl<'a, T: Send + Sync + 'static> IntoIterator for &'a EventReader<'a, T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<T: Send + Sync + 'static> EventQueue<T> {
     /// 新しい空のイベントキューを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { events: Vec::new() }
     }
 
@@ -70,6 +142,15 @@ impl<T: Send + Sync + 'static> AnyEventQueue for EventQueue<T> {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl<'a, T: Send + Sync + 'static> IntoIterator for &'a EventQueue<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

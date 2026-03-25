@@ -7,7 +7,7 @@ pub struct UtilHelper;
 
 #[allow(dead_code)]
 impl UtilHelper {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }

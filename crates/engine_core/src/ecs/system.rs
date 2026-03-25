@@ -16,6 +16,7 @@ pub enum SystemStage {
 
 impl SystemStage {
     /// デフォルトの実行順序を定義する。
+    #[must_use]
     pub const fn execution_order() -> &'static [Self] {
         &[Self::PreUpdate, Self::Update, Self::PostUpdate]
     }

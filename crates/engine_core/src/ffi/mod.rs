@@ -8,7 +8,9 @@ pub struct FfiBinding;
 
 #[allow(dead_code)]
 impl FfiBinding {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }
+
+pub mod filament_sys;
