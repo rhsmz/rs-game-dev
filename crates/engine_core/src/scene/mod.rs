@@ -5,8 +5,15 @@
 
 pub struct SceneManager;
 
+impl Default for SceneManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SceneManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }

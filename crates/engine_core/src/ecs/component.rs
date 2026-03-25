@@ -38,10 +38,65 @@ pub struct ComponentStorage<T: Component> {
     changed: Vec<bool>,
 }
 
+/// `ComponentStorage::iter()` の返却型（名前付きイテレータ）。
+pub struct StorageIter<'a, T: Component> {
+    dense_to_entity: std::iter::Copied<std::slice::Iter<'a, Entity>>,
+    dense: std::slice::Iter<'a, T>,
+}
+
+impl<'a, T: Component> StorageIter<'a, T> {
+    fn new(dense_to_entity: std::slice::Iter<'a, Entity>, dense: std::slice::Iter<'a, T>) -> Self {
+        Self { dense_to_entity: dense_to_entity.copied(), dense }
+    }
+}
+
+impl<'a, T: Component> Iterator for StorageIter<'a, T> {
+    type Item = (Entity, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let entity = self.dense_to_entity.next()?;
+        let component = self.dense.next()?;
+        Some((entity, component))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.dense.size_hint()
+    }
+}
+
+/// `ComponentStorage::iter_mut()` の返却型（名前付きイテレータ）。
+pub struct StorageIterMut<'a, T: Component> {
+    dense_to_entity: std::iter::Copied<std::slice::Iter<'a, Entity>>,
+    dense: std::slice::IterMut<'a, T>,
+}
+
+impl<'a, T: Component> StorageIterMut<'a, T> {
+    fn new(
+        dense_to_entity: std::slice::Iter<'a, Entity>,
+        dense: std::slice::IterMut<'a, T>,
+    ) -> Self {
+        Self { dense_to_entity: dense_to_entity.copied(), dense }
+    }
+}
+
+impl<'a, T: Component> Iterator for StorageIterMut<'a, T> {
+    type Item = (Entity, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let entity = self.dense_to_entity.next()?;
+        let component = self.dense.next()?;
+        Some((entity, component))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.dense.size_hint()
+    }
+}
+
 impl<T: Component> ComponentStorage<T> {
     /// 新しい空のストレージを作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             dense: Vec::new(),
             dense_to_entity: Vec::new(),
@@ -117,18 +172,20 @@ impl<T: Component> ComponentStorage<T> {
     }
 
     /// ストレージ内の全 Entity と Component をイテレートする。
-    pub fn iter(&self) -> impl Iterator<Item = (Entity, &T)> {
-        self.dense_to_entity.iter().copied().zip(self.dense.iter())
+    #[must_use]
+    pub fn iter(&self) -> StorageIter<'_, T> {
+        StorageIter::new(self.dense_to_entity.iter(), self.dense.iter())
     }
 
     /// ストレージ内の全 Entity と Component を可変参照でイテレートする。
     ///
     /// このイテレータから取得した Component はすべて「変更済み」としてマークされる。
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
+    #[must_use]
+    pub fn iter_mut(&mut self) -> StorageIterMut<'_, T> {
         for flag in &mut self.changed {
             *flag = true;
         }
-        self.dense_to_entity.iter().copied().zip(self.dense.iter_mut())
+        StorageIterMut::new(self.dense_to_entity.iter(), self.dense.iter_mut())
     }
 
     /// 「変更済み」とマークされた Entity と Component のみイテレートする。
@@ -158,6 +215,24 @@ impl<T: Component> ComponentStorage<T> {
     }
 }
 
+impl<'a, T: Component> IntoIterator for &'a ComponentStorage<T> {
+    type Item = (Entity, &'a T);
+    type IntoIter = StorageIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T: Component> IntoIterator for &'a mut ComponentStorage<T> {
+    type Item = (Entity, &'a mut T);
+    type IntoIter = StorageIterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 impl<T: Component> Default for ComponentStorage<T> {
     fn default() -> Self {
         Self::new()
@@ -183,7 +258,7 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
     }
 
     fn clear_changed_flags(&mut self) {
-        ComponentStorage::clear_changed_flags(self);
+        Self::clear_changed_flags(self);
     }
 }
 

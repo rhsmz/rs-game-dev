@@ -5,8 +5,15 @@
 
 pub struct ScriptManager;
 
+impl Default for ScriptManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScriptManager {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }

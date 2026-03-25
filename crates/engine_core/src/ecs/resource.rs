@@ -1,6 +1,6 @@
 //! グローバルリソース管理。
 //!
-//! ECS World に登録するシングルトンリソース (AudioManager, InputState 等) を
+//! ECS World に登録するシングルトンリソース (`AudioManager`, `InputState` 等) を
 //! 型安全に管理する。
 
 use std::any::{Any, TypeId};

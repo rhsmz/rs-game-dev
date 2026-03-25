@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use super::component::{AnyComponentStorage, Component, ComponentStorage};
 use super::entity::{Entity, EntityAllocator};
-use super::event::{EventQueue, EventQueues};
+use super::event::{EventQueue, EventQueues, EventReader, EventWriter};
 use super::resource::Resources;
 
 /// ECS World。Entity・Component・Resource の統合コンテナ。
@@ -62,7 +62,7 @@ impl World {
 
     /// 生存している Entity の数を返す。
     #[must_use]
-    pub fn entity_count(&self) -> usize {
+    pub const fn entity_count(&self) -> usize {
         self.entities.alive_count()
     }
 
@@ -113,10 +113,15 @@ impl World {
             .entry(TypeId::of::<T>())
             .or_insert_with(|| Box::new(ComponentStorage::<T>::new()));
 
-        self.components
+        let storage = self
+            .components
             .get_mut(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>())
-            .expect("storage type mismatch: this should never happen")
+            .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>());
+
+        storage.map_or_else(
+            || panic!("storage type mismatch: this should never happen"),
+            |storage| storage,
+        )
     }
 
     // ── Resource 操作 ──
@@ -164,6 +169,22 @@ impl World {
     /// すべてのイベントキューをクリアする。
     pub fn clear_all_events(&mut self) {
         self.events.clear_all();
+    }
+
+    /// 指定した型のイベントライタを取得する。
+    ///
+    /// 返却された `EventWriter` は、キューにイベントを追加するために使用する。
+    pub fn get_event_writer<T: Send + Sync + 'static>(&mut self) -> Option<EventWriter<'_, T>> {
+        let queue = self.events.get_mut::<T>()?;
+        Some(EventWriter::new(queue))
+    }
+
+    /// 指定した型のイベントリーダを取得する。
+    ///
+    /// 返却された `EventReader` は、キューに蓄積されたイベントを読み取るために使用する。
+    pub fn get_event_reader<T: Send + Sync + 'static>(&mut self) -> Option<EventReader<'_, T>> {
+        let queue = self.events.get_mut::<T>()?;
+        Some(EventReader::new(queue))
     }
 }
 
@@ -269,16 +290,26 @@ mod tests {
         let mut world = World::new();
         world.register_event::<PlayerDeath>();
 
-        world.send_event(PlayerDeath);
+        {
+            let mut writer = world.get_event_writer::<PlayerDeath>().unwrap();
+            writer.send(PlayerDeath);
+        }
 
-        let queue = world.get_event_queue_mut::<PlayerDeath>().unwrap();
-        assert_eq!(queue.drain().count(), 1);
+        {
+            let mut reader = world.get_event_reader::<PlayerDeath>().unwrap();
+            assert_eq!(reader.drain().count(), 1);
+        }
 
         // クリア後にキューが空になるか
-        world.send_event(PlayerDeath);
-        world.send_event(PlayerDeath);
+        {
+            let mut writer = world.get_event_writer::<PlayerDeath>().unwrap();
+            writer.send(PlayerDeath);
+            writer.send(PlayerDeath);
+        }
+
         world.clear_all_events();
-        let queue_after_clear = world.get_event_queue_mut::<PlayerDeath>().unwrap();
-        assert!(queue_after_clear.is_empty());
+
+        let reader_after_clear = world.get_event_reader::<PlayerDeath>().unwrap();
+        assert!(reader_after_clear.is_empty());
     }
 }

@@ -48,11 +48,14 @@ pub struct EntityAllocator {
 impl EntityAllocator {
     /// 新しい `EntityAllocator` を作成する。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { generations: Vec::new(), free_list: Vec::new(), alive: Vec::new(), alive_count: 0 }
     }
 
     /// 新しい Entity を割り当てる。
+    ///
+    /// # Panics
+    /// - Entity 数が多すぎて `u32` の index に収まらない場合。
     pub fn allocate(&mut self) -> Entity {
         self.alive_count += 1;
 
@@ -63,7 +66,7 @@ impl EntityAllocator {
         } else {
             // 新規割り当て
             let index = u32::try_from(self.generations.len())
-                .expect("Entity index overflow: too many entities allocated");
+                .unwrap_or_else(|_| panic!("Entity index overflow: too many entities allocated"));
             self.generations.push(0);
             self.alive.push(true);
             Entity { index, generation: 0 }
@@ -96,15 +99,24 @@ impl EntityAllocator {
 
     /// 現在生存している Entity の数を返す。
     #[must_use]
-    pub fn alive_count(&self) -> usize {
+    pub const fn alive_count(&self) -> usize {
         self.alive_count
     }
 
     /// 生存しているすべての Entity のイテレータを返す。
     pub fn iter(&self) -> impl Iterator<Item = Entity> + '_ {
-        (0..self.generations.len() as u32)
-            .filter(move |&idx| self.alive[idx as usize])
-            .map(move |idx| Entity { index: idx, generation: self.generations[idx as usize] })
+        let alive = &self.alive;
+        let generations = &self.generations;
+
+        (0..generations.len()).filter_map(move |idx| {
+            if !alive[idx] {
+                return None;
+            }
+
+            // allocator が index を `u32` に制限しているため、通常は必ず `Ok` になる。
+            let index = u32::try_from(idx).ok()?;
+            Some(Entity { index, generation: generations[idx] })
+        })
     }
 }
 
