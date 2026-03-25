@@ -1,0 +1,237 @@
+# タスクリスト — rs-game-dev
+
+## Phase 0: プロジェクト基盤
+
+### ワークスペース初期化 (plan/00)
+
+- [x] ルート `Cargo.toml` のワークスペース定義（`[workspace]` / `members` / `resolver = "2"`）
+- [x] `[workspace.package]` の設定（version, edition, license, rust-version）
+- [x] `[workspace.dependencies]` の共通依存定義（serde, rmp-serde, anyhow, thiserror, log, env_logger）
+- [x] `[workspace.lints.clippy]` の Clippy 共通リント設定
+- [x] `rustfmt.toml` / `clippy.toml` の作成
+- [x] `.gitignore` の設定
+- [x] `engine_core` クレート作成 + `lib.rs` モジュール宣言
+- [x] `engine_core` サブモジュール骨組み（ecs/, renderer/, audio/, asset/, script/, scene/, input/, save/, rng/, ffi/, util/）
+- [x] `script_editor` クレート作成 + `lib.rs` / `main.rs` + サブモジュール骨組み
+- [x] `game_player` クレート作成 + `main.rs`
+- [x] `cargo build --workspace` / `cargo test --workspace` 成功確認
+
+### ECS 基盤 (plan/01)
+
+- [x] `Entity` 構造体 + `EntityAllocator`（世代付き ID、free list 再利用、`is_alive` チェック）
+- [x] `Component` トレイト + `ComponentStorage<T>`（SparseSet 方式、O(1) 挿入/削除/参照）
+- [x] `AnyComponentStorage` トレイト（型消去によるストレージ管理）
+- [x] `Resources`（`TypeId` ベースのグローバルリソース管理）
+- [x] `System` トレイト + `FnSystem` + `into_system`
+- [x] `Schedule`（System の登録と順次実行）
+- [x] `World`（Entity 生成/破棄、Component 追加/削除、Resource 管理の統合コンテナ）
+- [x] `EventQueue<T>`（型付きイベントキュー、send / drain / iter）
+- [x] ECS ユニットテスト（Entity / Component / System / World / Event）
+
+### ECS API 仕上げ（未コミット差分）
+
+- [ ] `StorageIter` / `StorageIterMut` 名前付きイテレータの導入と検証
+- [ ] `QueryIter` / `QueryIterMut` の World レベル Query API 確定
+- [ ] `EventWriter<T>` / `EventReader<T>` ハンドルの整理と検証
+- [ ] イベントキューの型消去実装（`HashMap<TypeId, Box<dyn Any + Send>>`）の安全性確認
+- [ ] `world.rs` doc コメントの文字化け / 誤記の修正
+- [ ] `cargo fmt` / `cargo clippy -p engine_core -- -D warnings` の完全適用
+- [ ] 未コミット差分のコミットと develop マージ
+
+---
+
+## Phase 1: コアサブシステム（並行開発可能）
+
+### Renderer — Filament レンダラー統合 (plan/02)
+
+- [ ] Filament C API の FFI バインディング生成（`ffi/filament_sys.rs`）
+- [ ] `build.rs` でのライブラリリンク設定
+- [ ] `RenderEngine` ラッパー（Engine / Renderer / SwapChain の初期化・終了）
+- [ ] `GameView`（Perspective カメラ + PBR + IBL、Layer 0）
+- [ ] `UiView`（Ortho カメラ、深度テスト無効、Layer 1）
+- [ ] IBL / ライティング（HDR 環境マップ、DirectionalLight、SkyBox）
+- [ ] 2D スプライト描画（3D Quad + テクスチャ、Z-Order 制御）
+- [ ] Render-to-Texture（Live2D 合成用オフスクリーンターゲット）
+- [ ] ポストプロセス（Bloom、Tone Mapping、ガウシアンブラー）
+- [ ] ECS 連携（`MeshRenderer` / `Camera3D` Component、`render_system`）
+- [ ] ウィンドウ作成 + Filament 初期化テスト
+- [ ] マルチビュー描画テスト
+
+### Audio — サウンドシステム (plan/03)
+
+- [ ] `kira` クレート依存追加
+- [ ] `GameAudioManager`（kira ラッパー、BGM / SE / Voice の 3 トラック構成）
+- [ ] BGM 制御（ロード、ループ再生、クロスフェード遷移、一時停止/再開）
+- [ ] SE 制御（重複再生対応、ワンショット再生、ボリューム/パン制御）
+- [ ] Voice 再生 + RMS 解析リップシンク（`calculate_lip_sync_value`）
+- [ ] CSV メタデータ連携（`sound.csv` から `SoundMeta` デシリアライズ）
+- [ ] ECS 連携（`AudioSource` Component、`AudioCommand` enum）
+- [ ] AudioManager 初期化 / BGM 再生 / RMS 数値テスト
+
+### Input — 入力抽象化 (plan/04)
+
+- [ ] `InputState`（キーボード / マウス / ゲームパッドの状態管理）
+- [ ] `is_pressed` / `is_just_pressed` / `is_just_released` フレーム判定
+- [ ] `ActionMap`（物理入力 → アクション名マッピング）
+- [ ] `InputEvent` enum（KeyPressed / MouseMoved / ActionTriggered）
+- [ ] ECS イベントキューへの入力送信
+- [ ] `winit` ウィンドウイベントからの変換
+- [ ] アクションマッピング解決テスト / フレーム間リセットテスト
+
+### Dual RNG — 乱数エンジン (plan/05)
+
+- [ ] `rand` / `rand_xoshiro` / `rand_chacha` 依存追加
+- [ ] `VisualRng`（Xoshiro256++、演出用、非決定的シード）
+- [ ] `LogicRng`（ChaCha8、ロジック用、決定論的シード）
+- [ ] `derive_child_seed` によるシーン遷移時のシード・バケツリレー
+- [ ] ECS リソースとして登録（`world.insert_resource`）
+- [ ] 同一シード再現性テスト / 統計的一様分布テスト
+
+---
+
+## Phase 2: ゲームロジック基盤
+
+### Asset Management — アセット管理 (plan/06)
+
+- [ ] `AssetHandle<T>`（参照カウント方式、ロード状態追跡）
+- [ ] `Asset` トレイト（`from_bytes` によるデコード抽象化）
+- [ ] `AssetLoader`（非同期ファイル I/O、`tokio` / `async-std` ベース）
+- [ ] `LocaleRouter`（`common_` 接頭辞ルーティング、言語別フォールバック `{lang}/ → ja/`）
+- [ ] `AssetCache`（参照カウント、LRU、シーン遷移時パージ）
+- [ ] CSV メタデータ読み込み（`chara.csv` / `sound.csv` / `bg.csv` / `images.csv` / `voices.csv`）
+- [ ] `AssetDescriptor`（Scene の `required_assets()` 用、事前宣言リスト）
+- [ ] `AssetError` エラー型定義（`error.rs`）
+- [ ] ルーティング解決テスト / CSV デシリアライズテスト / キャッシュ管理テスト
+
+### Script System — スクリプトエンジン (plan/07)
+
+- [ ] タグベーススクリプト構文の設計確定
+- [ ] レキサー（`Token` enum、タグ / 属性 / テキスト / コメントのトークナイズ）
+- [ ] パーサ（`AstNode`、`[tag]...[/tag]` ネスト構造、属性 key="value" 解析）
+- [ ] `ScriptCommand` enum（SetBackground / PlayBgm / ShowCharacter / ShowText / Choice / Jump / SetVariable / Conditional / StartMiniGame 等）
+- [ ] AST → `ScriptCommand` への変換
+- [ ] `ScriptVm`（ステートマシン、プログラムカウンタ、変数管理、コールスタック）
+- [ ] VM 状態管理（Running / WaitingForClick / WaitingForChoice / WaitingForMiniGame / Finished）
+- [ ] `ScriptError` エラー型定義（`error.rs`）
+- [ ] ECS イベントキューとの連携（スクリプトコマンド → ECS イベント変換）
+- [ ] レキサー / パーサ / VM / コマンド変換のユニットテスト
+
+### Scene Management — シーン管理 (plan/08)
+
+- [ ] `Scene` トレイト（`on_enter` / `update` / `render` / `on_exit` / `required_assets`）
+- [ ] `SceneTransition` enum（None / Push / Pop / Replace / Quit）
+- [ ] `SceneManager`（スタックベース管理、遷移処理）
+- [ ] `SceneContext`（World / AssetLoader / Audio / Input / MiniGameResult へのアクセス）
+- [ ] 遷移フロー実装（`on_exit` → アセットパージ → 非同期ロード → `on_enter`）
+- [ ] `LoadingScreen`（進捗表示、ロード完了待ち）
+- [ ] `TransitionEffect`（Fade / Slide エフェクト）
+- [ ] シーンスタック Push/Pop/Replace テスト / ライフサイクル順序テスト
+
+---
+
+## Phase 3: 3D / Live2D 統合
+
+### Live2D Integration (plan/09)
+
+- [ ] Cubism Native SDK の C API FFI バインディング（`ffi/live2d_sys.rs`）
+- [ ] `build.rs` での Cubism SDK リンク設定
+- [ ] `Live2DModel` 安全ラッパー（MOC ロード、パラメータ get/set、update）
+- [ ] Render-to-Texture 統合（Live2D 描画 → Filament テクスチャ → 3D Quad マッピング）
+- [ ] モーション再生（`.motion3.json` パーサ、フェードイン/アウト、キュー管理）
+- [ ] 表情ブレンド（複数表情の重み付きブレンド、モーション並行適用）
+- [ ] 物理演算（揺れ物シミュレーション）
+- [ ] ECS 連携（`Live2DComponent`、リップシンク値連携）
+- [ ] スクリプト連携（`[chara motion="..." expression="..." lip_sync="on"]`）
+- [ ] MOC ロード / モーション再生 / RMS リップシンクテスト
+
+### VRM/FBX Integration (plan/10)
+
+- [ ] `gltf` クレート依存追加
+- [ ] VRM/GLB ローダー（glTF 2.0 パース → VRM 拡張データ抽出）
+- [ ] メッシュ → Filament VertexBuffer / IndexBuffer 変換
+- [ ] マテリアル → Filament Material 変換
+- [ ] `Skeleton`（ボーン階層管理）
+- [ ] `SpringBoneChain`（バーレ法物理シミュレーション、コライダー衝突判定）
+- [ ] `BlendShapeProxy`（MorphTarget、表情プリセット、リップシンク用母音）
+- [ ] `AnimationPlayer`（アニメーション再生、ブレンド遷移）
+- [ ] ECS 連携（`Model3DComponent`、`spring_bone_update_system` / `animation_update_system`）
+- [ ] GLB ロード / SpringBone 精度 / BlendShape 適用テスト
+
+---
+
+## Phase 4: UI / セーブ（並行開発可能）
+
+### UI System — MVVM + Signal 駆動 (plan/11)
+
+- [ ] `Signal<T>` リアクティブシステム（ファイングレイン変更検知、通知）
+- [ ] `taffy` クレート依存追加
+- [ ] `UiLayoutEngine`（Taffy Flexbox 連携、ノード追加、レイアウト計算）
+- [ ] SDF テキストレンダラー（フォント → SDF アトラス、Filament カスタムマテリアル、文字送りアニメーション）
+- [ ] `GlassStyle` Glassmorphism マテリアル（ガウシアンブラー + 半透明 + ボーダー）
+- [ ] `MessageWindow` ウィジェット（テキスト表示、話者名、文字送り、Glassmorphism 背景）
+- [ ] `ChoicePanel` ウィジェット（選択肢リスト、ホバー/選択状態）
+- [ ] `StatusBar` / `Button` / `Slider` ウィジェット
+- [ ] ECS ↔ UI 通信（`UiCommand` enum → mpsc、`ui_sync_system` → Signal 更新）
+- [ ] Signal 変更検知テスト / Taffy レイアウト正確性テスト / Widget 状態遷移テスト
+
+### Save System — セーブ/ロード (plan/12)
+
+- [ ] `SaveFile` 構造体（version, timestamp, script_pos, global_vars, rng_seed, thumbnail 等）
+- [ ] MessagePack シリアライズ / デシリアライズ（`rmp_serde` round-trip）
+- [ ] `SaveManager`（スロット管理 `slot_000.sav`〜、オートセーブ / クイックセーブ）
+- [ ] バージョンマイグレーション（`version` フィールドによる再帰的マイグレーション）
+- [ ] サムネイルキャプチャ（Filament フレームバッファ読み取り → 128×72 JPEG）
+- [ ] ECS 連携（`SaveCommand` enum、`save_system`）
+- [ ] round-trip テスト / マイグレーションチェーンテスト / スロット管理テスト
+
+---
+
+## Phase 5: アプリケーション統合
+
+### Script Editor — オーサリングツール (plan/13)
+
+- [ ] エディタ UI シェル（MVVM + Signal、マルチパネルレイアウト、メニューバー）
+- [ ] スクリプト編集パネル（シンタックスハイライト、タグ入力補完、エラー表示）
+- [ ] ライブプレビューエンジン（`notify` ファイル変更検知、ホットリロード、現在行から再生）
+- [ ] インスペクタ — Live2D パラメータスライダー
+- [ ] インスペクタ — 3D モデル配置 / 回転 / スケール Gizmo
+- [ ] インスペクタ — セーブデータ JSON 編集
+- [ ] アセットブラウザ（ツリー表示、D&D 参照挿入、サムネイルプレビュー）
+- [ ] FBX → GLB 変換（インポート / エクスポート）
+- [ ] ホットリロード検知テスト / パラメータ変更反映テスト
+
+### Game Player — 配布用ランタイム (plan/14)
+
+- [ ] メインループ（固定タイムステップ + 可変レンダリング）
+- [ ] `Config` ランタイム設定（`config.toml`、ウィンドウ / オーディオ / ロケール）
+- [ ] `AssetArchive`（.pak ファイルリーダー、インデックス、LZ4 圧縮オプション）
+- [ ] ウィンドウ管理（`winit`、フルスクリーン/ウィンドウ切替、リサイズ対応）
+- [ ] Feature フラグによるデバッグ機能除外（`editor` / `debug_ui` feature）
+- [ ] .pak アーカイブ作成 / 読み込みテスト
+- [ ] config.toml パーステスト / メインループ起動/終了テスト
+
+---
+
+## Phase 6: CI/CD・ドキュメント・品質
+
+### CI/CD
+
+- [ ] GitHub Actions ワークフロー構築（`cargo fmt` / `cargo clippy` / `cargo test`）
+- [ ] クロスプラットフォームビルド (Windows, macOS, Linux)
+- [ ] リリースバイナリの自動生成
+- [ ] コードカバレッジの計測と可視化
+
+### ドキュメント
+
+- [ ] README.md の充実（使い方、ビルド手順、アーキテクチャ図）
+- [ ] `cargo doc` による API ドキュメント生成
+- [ ] アーキテクチャ図の更新（Mermaid）
+- [ ] CONTRIBUTING.md の作成
+- [ ] CHANGELOG.md の運用開始
+
+### 品質
+
+- [ ] 全モジュールの Clippy 警告ゼロ化
+- [ ] `cargo fmt` による統一フォーマット
+- [ ] ベンチマークテスト（ECS クエリ性能、レンダリングフレームレート）
+- [ ] 統合テスト（`tests/` ディレクトリ）の充実

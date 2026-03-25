@@ -1,0 +1,107 @@
+---
+description: クレート構造規約（依存方向・公開API）
+globs: **/Cargo.toml
+alwaysApply: true
+---
+
+# クレート構造規約
+
+## Workspace 構成
+
+```toml
+# Cargo.toml (ルート)
+[workspace]
+members = [
+    "crates/engine_core",
+    "crates/script_editor",
+    "crates/game_player",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# 共通依存をワークスペースレベルで管理
+serde = { version = "1", features = ["derive"] }
+rmp-serde = "1"
+anyhow = "1"
+thiserror = "2"
+log = "0.4"
+```
+
+## クレート概要
+
+### `engine_core` — 心臓部 (Model)
+
+- **責務**: ゲームエンジンのコアロジック全般
+- **サブモジュール構成**:
+  - `ecs/` — Entity Component System 基盤
+  - `renderer/` — Filament ラッパー、マルチビューレンダリング
+  - `live2d/` — Live2D Cubism SDK FFI ラッパー
+  - `vrm/` — VRM/FBX ローダー、SpringBone
+  - `audio/` — kira/rodio ベースのサウンドシステム
+  - `asset/` — 非同期アセットローダー、キャッシュ
+  - `script/` — タグベーススクリプトパーサ、ステートマシン
+  - `scene/` — Scene トレイト、シーンマネージャー
+  - `input/` — 入力抽象化
+  - `save/` — セーブ/ロード（MessagePack）
+  - `rng/` — Dual RNG (Xoshiro256++ / ChaCha8)
+  - `ffi/` — C/C++ FFI 境界の隔離モジュール
+
+### `script_editor` — オーサリングツール
+
+- **責務**: スクリプト編集、ライブプレビュー、ビジュアル編集
+- **依存**: `engine_core` に依存
+- **サブモジュール構成**:
+  - `ui/` — エディタ UI (MVVM + Signal)
+  - `preview/` — ライブプレビューエンジン
+  - `inspector/` — Live2D パラメータ、3D 配置の編集
+  - `project/` — プロジェクト管理、アセットブラウザ
+
+### `game_player` — 配布用ランタイム
+
+- **責務**: デバッグ機能を省いた軽量実行環境
+- **依存**: `engine_core` に依存
+- **サブモジュール構成**:
+  - `archive/` — アセットアーカイブ解読
+  - `runtime/` — メインループ、設定ロード
+
+## 依存関係ルール
+
+```text
+game_player ──→ engine_core
+script_editor ──→ engine_core
+```
+
+- `engine_core` は他のクレートに依存しない（最下層）
+- `script_editor` と `game_player` は互いに依存しない
+- 循環依存は厳禁
+
+## 公開 API 設計
+
+- 各クレートのルート (`lib.rs`) で公開モジュールを re-export
+- 内部実装は `pub(crate)` で隠蔽
+- Feature flag で機能のオプション化
+
+```rust
+// engine_core/src/lib.rs
+pub mod ecs;
+pub mod renderer;
+pub mod audio;
+pub mod asset;
+pub mod script;
+pub mod scene;
+pub mod save;
+
+// 内部のみ
+pub(crate) mod ffi;
+pub(crate) mod util;
+```
+
+## 新クレート追加時
+
+1. `crates/<name>/` ディレクトリ作成
+2. `cargo init --lib crates/<name>`
+3. ルート `Cargo.toml` の `members` に追加
+4. 依存方向ルールに違反しないことを確認
+5. README にクレート説明を追記
+
+詳細手順は `.agent/workflows/new_crate.md` を参照。
