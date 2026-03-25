@@ -11,6 +11,13 @@ rmp-serde = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+raw-window-handle = "0.6.2"
+winit = { version = "0.30.13", optional = true }
 
 [lints]
 workspace = true
+
+[features]
+# Filament を有効にする場合だけ、build.rs がリンク設定を行う。
+filament = ["dep:winit"]
+winit = ["dep:winit"]
