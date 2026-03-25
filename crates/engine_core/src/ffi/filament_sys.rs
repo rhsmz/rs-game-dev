@@ -56,6 +56,12 @@ unsafe extern "C" {
     /// Filament Renderer を生成する。
     pub(crate) fn Renderer_create(engine: *mut Engine) -> *mut Renderer;
 
+    /// Filament Renderer を破棄する。
+    pub(crate) fn Renderer_destroy(renderer: *mut Renderer);
+
     /// Filament `SwapChain` を生成する。
     pub(crate) fn SwapChain_create(engine: *mut Engine) -> *mut SwapChain;
+
+    /// Filament `SwapChain` を破棄する。
+    pub(crate) fn SwapChain_destroy(swap_chain: *mut SwapChain);
 }

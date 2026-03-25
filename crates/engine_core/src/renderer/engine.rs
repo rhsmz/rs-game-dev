@@ -43,12 +43,19 @@ impl RenderEngine {
                 .ok_or_else(|| anyhow!("Filament Engine_create returned null"))?;
 
             let renderer_ptr = unsafe { filament_sys::Renderer_create(engine.as_ptr()) };
-            let renderer = NonNull::new(renderer_ptr)
-                .ok_or_else(|| anyhow!("Filament Renderer_create returned null"))?;
+            let renderer = NonNull::new(renderer_ptr).ok_or_else(|| {
+                // SAFETY: `engine` は直前で生成済みなので、ここで破棄してリークを防ぐ。
+                unsafe { filament_sys::Engine_destroy(engine.as_ptr()) };
+                anyhow!("Filament Renderer_create returned null")
+            })?;
 
             let swap_chain_ptr = unsafe { filament_sys::SwapChain_create(engine.as_ptr()) };
-            let swap_chain = NonNull::new(swap_chain_ptr)
-                .ok_or_else(|| anyhow!("Filament SwapChain_create returned null"))?;
+            let swap_chain = NonNull::new(swap_chain_ptr).ok_or_else(|| {
+                // SAFETY: `renderer` と `engine` は生成済みなので、ここで破棄してリークを防ぐ。
+                unsafe { filament_sys::Renderer_destroy(renderer.as_ptr()) };
+                unsafe { filament_sys::Engine_destroy(engine.as_ptr()) };
+                anyhow!("Filament SwapChain_create returned null")
+            })?;
 
             Ok(Self { engine, renderer, swap_chain })
         }
@@ -82,7 +89,10 @@ impl Drop for RenderEngine {
     fn drop(&mut self) {
         #[cfg(feature = "filament")]
         {
-            // SAFETY: `engine` は `NonNull` として保持しており、寿命は `RenderEngine` の所有者に一致する。
+            // SAFETY: すべて `NonNull` として保持しており、寿命は `RenderEngine` の所有者に一致する。
+            //         破棄順は依存関係を考慮して SwapChain -> Renderer -> Engine とする。
+            unsafe { filament_sys::SwapChain_destroy(self.swap_chain.as_ptr()) };
+            unsafe { filament_sys::Renderer_destroy(self.renderer.as_ptr()) };
             unsafe { filament_sys::Engine_destroy(self.engine.as_ptr()) };
         }
     }
