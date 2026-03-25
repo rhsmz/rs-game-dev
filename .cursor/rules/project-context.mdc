@@ -1,0 +1,36 @@
+---
+description: プロジェクト概要・技術スタック・全体方針
+alwaysApply: true
+---
+# プロジェクト概要
+
+| 項目 | 値 |
+|---|---|
+| **名称** | rs-game-dev |
+| **概要** | Rust 製アドベンチャーゲームエンジン。ビジュアルノベルコアにミニゲーム（2D/3Dアクション、RPG、パズル、RTS）を統合するプラグイン型アーキテクチャ。 |
+| **言語** | Rust |
+| **ビルドツール** | Cargo (workspace) |
+| **参考作品** | 恋姫†無双 (Koihime Musō)、TWINKLE CRUSADERS |
+
+## 技術スタック
+
+| カテゴリ | 技術 |
+|---|---|
+| **レンダラー** | Google Filament (PBR, IBL, ポストプロセス) |
+| **2D キャラクター** | Live2D Cubism Native SDK (C++ → Rust FFI) |
+| **3D キャラクター** | VRM / FBX (SpringBone, BlendShape, GLB変換) |
+| **UI レイアウト** | Taffy (Flexbox) + Signal駆動リアクティブ (Floem思想) |
+| **UI レンダリング** | SDF テキスト、Glassmorphism マテリアル |
+| **オーディオ** | `kira` or `rodio` (BGM/SE/Voice ミキシング) |
+| **ECS** | 自作 Entity Component System |
+| **シリアライズ** | `serde`, `rmp-serde` (MessagePack), CSV メタデータ |
+| **スクリプト** | タグベース独自スクリプト構文 (パーサ + ステートマシン) |
+| **RNG** | Xoshiro256++ (演出用) / ChaCha8 (ロジック・リプレイ用) |
+
+## 全体方針
+
+- Rust のメモリ安全性・借用チェッカーを尊重し `unsafe` は FFI 境界のみに限定
+- `clippy` / `rustfmt` を常に適用
+- ECS と UI を直接参照せずメッセージパッシングで疎結合に連携
+- ミニゲームは `Scene` トレイトを実装した独立プラグインとして追加
+- セーブデータは MessagePack 形式 (`rmp-serde`)
