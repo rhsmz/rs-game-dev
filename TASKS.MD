@@ -1,8 +1,12 @@
 # タスクリスト — rs-game-dev
 
-## Phase 0: プロジェクト基盤
+> **最終更新**: 2026-03-25
+> **ビルド状態**: `cargo test --workspace` 40 テスト全パス / `cargo fmt` OK / `cargo clippy` スタブモジュール 85 件要修正
+> **現在ブランチ**: develop (HEAD: f14014f)
 
-### ワークスペース初期化 (plan/00)
+## Phase 0: プロジェクト基盤 ✅
+
+### ワークスペース初期化 (plan/00) ✅
 
 - [x] ルート `Cargo.toml` のワークスペース定義（`[workspace]` / `members` / `resolver = "2"`）
 - [x] `[workspace.package]` の設定（version, edition, license, rust-version）
@@ -16,7 +20,7 @@
 - [x] `game_player` クレート作成 + `main.rs`
 - [x] `cargo build --workspace` / `cargo test --workspace` 成功確認
 
-### ECS 基盤 (plan/01)
+### ECS 基盤 (plan/01) ✅
 
 - [x] `Entity` 構造体 + `EntityAllocator`（世代付き ID、free list 再利用、`is_alive` チェック）
 - [x] `Component` トレイト + `ComponentStorage<T>`（SparseSet 方式、O(1) 挿入/削除/参照）
@@ -28,15 +32,25 @@
 - [x] `EventQueue<T>`（型付きイベントキュー、send / drain / iter）
 - [x] ECS ユニットテスト（Entity / Component / System / World / Event）
 
-### ECS API 仕上げ（未コミット差分）
+### ECS クエリ・フィルタ拡張 (PR #18, #19) ✅
 
-- [ ] `StorageIter` / `StorageIterMut` 名前付きイテレータの導入と検証
-- [ ] `QueryIter` / `QueryIterMut` の World レベル Query API 確定
-- [ ] `EventWriter<T>` / `EventReader<T>` ハンドルの整理と検証
-- [ ] イベントキューの型消去実装（`HashMap<TypeId, Box<dyn Any + Send>>`）の安全性確認
-- [ ] `world.rs` doc コメントの文字化け / 誤記の修正
-- [ ] `cargo fmt` / `cargo clippy -p engine_core -- -D warnings` の完全適用
-- [ ] 未コミット差分のコミットと develop マージ
+- [x] `QueryParam` / `ReadOnlyQueryParam` トレイト（Sealed パターンで外部実装を禁止）
+- [x] `With<T>` / `Without<T>` クエリフィルタ
+- [x] `Query<Q>` / `QueryMut<Q>` クエリ実行オブジェクト（`iter` / `iter_mut` / `get` / `get_mut`）
+- [x] `WorldQueryExt` トレイト（`world.query::<Q>()` / `world.query_mut::<Q>()`）
+- [x] 2 要素タプルクエリ（`(&T1, &T2)`, `(&T1, With<T2>)`, `(&T1, Without<T2>)`, `(&mut T1, With/Without<T2>)` 等）
+- [x] `ComponentStorage` 変更検知（changed フラグ、`iter_changed`、`clear_changed_flags`）
+- [x] 基本 Component 定義（`Transform`, `Name`, `Active`）
+- [x] `SystemStage`（`PreUpdate` / `Update` / `PostUpdate` 実行フェーズ）
+- [x] `EntityAllocator::iter` の O(1) 最適化（alive bitmap）
+- [x] `EventQueues`（`HashMap<TypeId, Box<dyn AnyEventQueue>>` による型消去コンテナ）
+- [x] クエリ・フィルタ ユニットテスト（40 件全パス）
+
+### ECS API 残タスク
+
+- [ ] `StorageIter` / `StorageIterMut` 名前付きイテレータの導入（現在は `impl Iterator` で返却）
+- [ ] `EventWriter<T>` / `EventReader<T>` ハンドル型の導入（現在は `EventQueue<T>` を直接操作）
+- [ ] スタブモジュールの Clippy 警告修正（asset, audio, input, renderer, rng, save, scene, script, ffi, util — 計 85 件: `Default` 未実装、`#[must_use]` 不足、`const fn` 化 等）
 
 ---
 
