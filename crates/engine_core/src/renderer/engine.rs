@@ -80,8 +80,9 @@ impl RenderEngine {
 
     /// リサイズ（雛形）。
     #[allow(clippy::missing_const_for_fn)]
+    #[allow(clippy::unused_self)]
     pub fn resize(&mut self, width: u32, height: u32) {
-        let _ = (width, height, self);
+        let _ = (width, height);
     }
 }
 

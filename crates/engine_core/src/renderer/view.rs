@@ -6,9 +6,6 @@ use crate::ffi::filament_sys;
 use crate::renderer::RenderEngine;
 
 #[cfg(feature = "filament")]
-use anyhow::anyhow;
-
-#[cfg(feature = "filament")]
 use std::ptr::NonNull;
 
 /// 3D 視点用カメラ情報。
@@ -71,6 +68,17 @@ impl GameView {
         }
     }
 }
+
+// SAFETY: Filament ポインタはメインスレッドでのみ操作する前提。
+// ECS リソース登録のために Send + Sync を明示する。
+#[cfg(feature = "filament")]
+unsafe impl Send for GameView {}
+#[cfg(feature = "filament")]
+unsafe impl Sync for GameView {}
+#[cfg(feature = "filament")]
+unsafe impl Send for UiView {}
+#[cfg(feature = "filament")]
+unsafe impl Sync for UiView {}
 
 impl UiView {
     /// UI View を初期化する（雛形）。

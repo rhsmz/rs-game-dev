@@ -50,8 +50,14 @@ unsafe extern "C" {
     /// Filament Scene を生成する。
     pub(crate) fn Scene_create(engine: *mut Engine) -> *mut Scene;
 
+    /// Filament Scene を破棄する。
+    pub(crate) fn Scene_destroy(scene: *mut Scene);
+
     /// Filament View を生成する。
     pub(crate) fn View_create(engine: *mut Engine) -> *mut View;
+
+    /// Filament View を破棄する。
+    pub(crate) fn View_destroy(view: *mut View);
 
     /// Filament Renderer を生成する。
     pub(crate) fn Renderer_create(engine: *mut Engine) -> *mut Renderer;
