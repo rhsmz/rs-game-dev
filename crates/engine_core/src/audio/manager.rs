@@ -104,16 +104,15 @@ impl GameAudioManager {
     /// - `TrackHandle::play` が失敗した場合
     pub fn crossfade_bgm_to(
         &mut self,
-        sound_data: StaticSoundData,
+        sound_data: &StaticSoundData,
         fade_ms: u64,
     ) -> anyhow::Result<StaticSoundHandle> {
         self.purge_faded_tracks();
 
         let tween = Tween { duration: Duration::from_millis(fade_ms), ..Default::default() };
 
-        let mut next_bgm_track =
+        let next_bgm_track =
             self.manager.add_sub_track(TrackBuilder::default()).map_err(|e| anyhow!(e))?;
-        next_bgm_track.set_volume(Decibels::SILENCE, Tween::default());
 
         let mut previous_bgm_track = std::mem::replace(&mut self.bgm_track, next_bgm_track);
         previous_bgm_track.set_volume(Decibels::SILENCE, tween);
@@ -122,8 +121,9 @@ impl GameAudioManager {
             fade_done_at: Instant::now() + Duration::from_millis(fade_ms),
         });
 
-        let handle = self.bgm_track.play(sound_data).map_err(|e| anyhow!(e))?;
-        self.bgm_track.set_volume(Decibels::IDENTITY, tween);
+        let mut handle =
+            self.bgm_track.play(sound_data.volume(Decibels::SILENCE)).map_err(|e| anyhow!(e))?;
+        handle.set_volume(Decibels::IDENTITY, tween);
 
         Ok(handle)
     }
