@@ -10,12 +10,17 @@ pub fn calculate_lip_sync_value(audio_samples: &[f32], frame_size: usize) -> f32
         return 0.0;
     }
 
-    let sum_sq: f32 = audio_samples.iter().take(frame_size).map(|s| s * s).sum();
+    let sample_count = audio_samples.len().min(frame_size);
+    if sample_count == 0 {
+        return 0.0;
+    }
+
+    let sum_sq: f32 = audio_samples.iter().take(sample_count).map(|s| s * s).sum();
 
     #[allow(clippy::cast_precision_loss)]
-    let frame_size_f32 = frame_size as f32;
+    let sample_count_f32 = sample_count as f32;
 
-    let rms = sum_sq / frame_size_f32;
+    let rms = sum_sq / sample_count_f32;
     let rms = rms.sqrt();
 
     (rms * 10.0).clamp(0.0, 1.0)
@@ -42,5 +47,11 @@ mod tests {
         // RMS = 1.0 → (1.0 * 10.0).clamp(0.0, 1.0) = 1.0
         let samples = [1.0_f32; 64];
         assert_eq!(calculate_lip_sync_value(&samples, 64), 1.0);
+    }
+
+    #[test]
+    fn test_calculate_lip_sync_value_short_buffer_uses_actual_sample_count() {
+        let samples = [1.0_f32, 1.0_f32];
+        assert_eq!(calculate_lip_sync_value(&samples, 4), 1.0);
     }
 }

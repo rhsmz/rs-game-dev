@@ -99,12 +99,18 @@ impl GameAudioManager {
     ) -> anyhow::Result<StaticSoundHandle> {
         let tween = Tween { duration: Duration::from_millis(fade_ms), ..Default::default() };
 
-        // 先にフェードアウト（既存サウンドが対象）。
-        self.bgm_track.set_volume(Decibels::SILENCE, tween);
+        // 新しい BGM 専用トラックを用意し、旧トラックをフェードアウトする。
+        // 同一トラックに即時 fade-out/fade-in を当てないことで、クロスフェードを成立させる。
+        let mut next_bgm_track = self
+            .manager
+            .add_sub_track(TrackBuilder::default())
+            .map_err(|e| anyhow!(e))?;
+        next_bgm_track.set_volume(Decibels::SILENCE, Tween::default());
 
-        let handle = self.play_bgm(sound_data)?;
+        let mut previous_bgm_track = std::mem::replace(&mut self.bgm_track, next_bgm_track);
+        previous_bgm_track.set_volume(Decibels::SILENCE, tween);
 
-        // その後フェードイン。
+        let handle = self.bgm_track.play(sound_data).map_err(|e| anyhow!(e))?;
         self.bgm_track.set_volume(Decibels::IDENTITY, tween);
 
         Ok(handle)
