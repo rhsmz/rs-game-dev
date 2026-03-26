@@ -203,12 +203,14 @@ impl GameAudioManager {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
     use kira::Frame;
     use kira::sound::static_sound::StaticSoundSettings;
 
     #[test]
-    #[ignore] // 音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする
+    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
     fn test_game_audio_manager_play_bgm_returns_ok() -> anyhow::Result<()> {
         let mut manager = GameAudioManager::new()?;
 
@@ -227,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // 音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする
+    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
     fn test_play_bgm_loop_zero_loop_end_plays_to_end() -> anyhow::Result<()> {
         let mut manager = GameAudioManager::new()?;
         let frames: std::sync::Arc<[Frame]> = (0..4410).map(|_| Frame::from_mono(0.0)).collect();
@@ -244,14 +246,14 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // 音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする
+    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
     fn test_crossfade_bgm_to_preserves_source_volume() -> anyhow::Result<()> {
         use kira::Value;
         let mut manager = GameAudioManager::new()?;
         let frames: std::sync::Arc<[Frame]> = (0..32).map(|_| Frame::from_mono(0.0)).collect();
         let sound_data = StaticSoundData {
             sample_rate: 44_100,
-            frames: frames.clone(),
+            frames,
             settings: StaticSoundSettings::default(),
             slice: None,
         };
