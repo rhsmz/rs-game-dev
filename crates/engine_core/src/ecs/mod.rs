@@ -16,7 +16,7 @@ pub mod world;
 pub use component::{Component, ComponentStorage};
 pub use components::{Active, Name, Transform};
 pub use entity::Entity;
-pub use event::{EventQueue, EventQueues};
+pub use event::{EventQueue, EventQueues, EventReader, EventWriter};
 pub use query::{QueryParam, WorldQueryExt};
 pub use resource::Resources;
 pub use system::{Schedule, System, SystemStage, into_system};

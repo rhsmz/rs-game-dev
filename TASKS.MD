@@ -1,8 +1,8 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-25
-> **ビルド状態**: `cargo test --workspace` 40 テスト全パス / `cargo fmt` OK / `cargo clippy` スタブモジュール 85 件要修正
-> **現在ブランチ**: develop (HEAD: f14014f)
+> **最終更新**: 2026-03-27
+> **ビルド状態**: `cargo test --workspace` 46 テスト全パス（3 ignored）/ `cargo fmt` OK / `cargo clippy` 警告 0 件
+> **現在ブランチ**: develop (HEAD: 95afc7c)
 
 ## Phase 0: プロジェクト基盤 ✅
 
