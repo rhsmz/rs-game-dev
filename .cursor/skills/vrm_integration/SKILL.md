@@ -1,20 +1,20 @@
 ---
 name: vrm_integration
-description: VRM/FBX 3Dモデル統合スキル（SpringBone、BlendShape、GLB変換）
+description: VRM/FBX 3D model integration skill (SpringBone, BlendShape, GLB conversion)
 ---
 
-# VRM/FBX 統合スキル
-## 概要
-VRM（バーチャルキャスト標準）と FBX フォーマットの3Dモデルを Filament レンダラーに統合する。SpringBone による揺れ物シミュレーション、BlendShape による表情制御、エディタでの GLB 事前変換をサポートする。
+# VRM/FBX Integration Skill
+## Overview
+Integrate VRM (VirtualCast standard) and FBX 3D models into the Filament renderer. Support SpringBone secondary-motion simulation, BlendShape-based expression control, and editor-side GLB preprocessing.
 
-## 対応フォーマット
-| フォーマット | 用途 | 処理 |
+## Supported Formats
+| Format | Use | Handling |
 |-------------|------|------|
-| VRM (.vrm) | バーチャルキャラクター | 直接ロード、SpringBone 対応 |
-| FBX (.fbx) | 汎用3Dモデル | エディタで GLB に事前変換 |
-| GLB (.glb) | ランタイムフォーマット | 高速ロード |
+| VRM (.vrm) | Virtual character | Direct load with SpringBone support |
+| FBX (.fbx) | Generic 3D model | Pre-convert to GLB in editor |
+| GLB (.glb) | Runtime format | Fast load |
 
-## VRM ローダー
+## VRM Loader
 ```rust
 // crates/engine_core/src/vrm/loader.rs
 
@@ -28,42 +28,42 @@ pub struct VrmModel {
 
 impl VrmModel {
     pub fn load(data: &[u8]) -> Result<Self, VrmError> {
-        // glTF 2.0 パース → VRM 拡張データ抽出
-        // メッシュ → Filament VertexBuffer / IndexBuffer 変換
-        // スケルトン構築
-        // SpringBone パラメータ抽出
-        // BlendShape 定義読み込み
+        // Parse glTF 2.0 -> extract VRM extension data
+        // Mesh -> convert to Filament VertexBuffer / IndexBuffer
+        // Build skeleton
+        // Extract SpringBone parameters
+        // Load BlendShape definitions
         Ok(Self { /* ... */ })
     }
 }
 ```
 
-## SpringBone シミュレーション
-VRM の揺れ物（髪、衣装、アクセサリ）をフレームごとにシミュレーション。
+## SpringBone Simulation
+Per-frame simulation of VRM secondary motion (hair, clothing, accessories).
 ```rust
 // crates/engine_core/src/vrm/spring_bone.rs
 
 pub struct SpringBone {
-    pub stiffness: f32,     // 剛性
-    pub gravity_power: f32, // 重力
-    pub drag_force: f32,    // 抵抗力
-    pub hit_radius: f32,    // 当たり判定半径
+    pub stiffness: f32,     // stiffness
+    pub gravity_power: f32, // gravity
+    pub drag_force: f32,    // drag
+    pub hit_radius: f32,    // collision radius
     bones: Vec<SpringBoneNode>,
 }
 
 impl SpringBone {
     pub fn update(&mut self, dt: f32, center: &Transform) {
         for bone in &mut self.bones {
-            // バーレ法による物理演算
-            // コライダー衝突判定
-            // ボーン位置更新
+            // Verlet integration physics
+            // Collider collision detection
+            // Bone position update
         }
     }
 }
 ```
 
 ## BlendShape (MorphTarget)
-VRM の `BlendShapeProxy` を Filament の MorphTarget にマッピング。
+Map VRM `BlendShapeProxy` to Filament MorphTargets.
 ```rust
 pub struct BlendShapeProxy {
     presets: HashMap<BlendShapePreset, Vec<BlendShapeBinding>>,
@@ -78,55 +78,54 @@ pub enum BlendShapePreset {
     Blink,
     BlinkL,
     BlinkR,
-    // VRM 標準プリセット
+    // VRM standard presets
 }
 
 impl BlendShapeProxy {
     pub fn set_value(&mut self, preset: BlendShapePreset, weight: f32) {
-        // MorphTarget ウェイト更新
+        // Update MorphTarget weights
     }
 }
 ```
 
-## FBX → GLB 変換
-エディタ (`script_editor`) で FBX を GLB に事前変換し、ランタイムでは GLB のみをロード。
+## FBX -> GLB Conversion
+Pre-convert FBX to GLB in the editor (`script_editor`); runtime loads GLB only.
 ```text
 [script_editor]
-  FBX インポート → アニメーション保持 → GLB エクスポート
-      ↓
+  FBX import -> preserve animations -> GLB export
+      |
 [game_player / engine_core]
-  GLB 高速ロード
+  Fast GLB load
 ```
 
-## ECS 連携
+## ECS Integration
 ```rust
-// 3D モデル用 Component
+// 3D model component
 pub struct Model3DComponent {
     pub model: VrmModel,
     pub current_animation: Option<AnimationId>,
     pub blend_shape_state: HashMap<BlendShapePreset, f32>,
 }
 
-// SpringBone 更新 System
-pub fn spring_bone_update_system(/* ECS クエリ */) {
-    // 全 VRM の SpringBone を物理更新
+// SpringBone update system
+pub fn spring_bone_update_system(/* ECS query */) {
+    // Physics update for all VRM SpringBones
 }
 
-// BlendShape 更新 System
-pub fn blend_shape_update_system(/* ECS クエリ */) {
-    // 表情パラメータを MorphTarget に反映
+// BlendShape update system
+pub fn blend_shape_update_system(/* ECS query */) {
+    // Apply expression parameters to MorphTargets
 }
 ```
 
-## スクリプト連携
+## Script Integration
 ```text
 [chara3d id="warrior" animation="idle"]
 [chara3d id="warrior" expression="joy" weight="0.8"]
 [chara3d id="warrior" animation="attack" blend="0.3"]
 ```
 
-## 注意事項
-- VRM 1.0 仕様に準拠
-- SpringBone の負荷が高い場合、LOD で更新頻度を調整
-- FBX→GLB 変換は `script_editor` の機能として提供（ランタイムでは FBX を扱わない）
-
+## Notes
+- Follow VRM 1.0 specification.
+- If SpringBone is expensive, reduce update frequency via LOD.
+- FBX->GLB conversion is a `script_editor` feature (runtime does not handle FBX).

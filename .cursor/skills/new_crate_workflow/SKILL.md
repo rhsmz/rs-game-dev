@@ -1,19 +1,19 @@
 ---
 name: new_crate_workflow
-description: Cargo Workspace に新しいクレートを追加する手順を案内する。`cargo init --lib` でクレートを作成し、ルート `Cargo.toml` に `members` を追加してビルド/テスト/ドキュメントまで行いたいときに使用する。
+description: Guides adding a new crate to the Cargo workspace, from cargo init to build, test, and documentation.
 ---
 
-# 新クレート追加ワークフロー
+# New Crate Workflow
 
-## 手順
+## Steps
 
-### 1. クレートディレクトリ作成
+### 1. Create crate directory
 ```bash
 cargo init --lib crates/{crate_name}
 ```
 
-### 2. Workspace に登録
-ルート `Cargo.toml` の `members` に新クレートを追加する。
+### 2. Register in workspace
+Add the new crate to `members` in the root `Cargo.toml`.
 
 ```toml
 [workspace]
@@ -21,12 +21,12 @@ members = [
     "crates/engine_core",
     "crates/script_editor",
     "crates/game_player",
-    "crates/{crate_name}",  # 追加
+    "crates/{crate_name}",  # added
 ]
 ```
 
-### 3. 依存関係の設定
-新クレートの `Cargo.toml` で workspace 共通依存を利用する。
+### 3. Configure dependencies
+Use workspace-shared dependencies in the new crate's `Cargo.toml`.
 
 ```toml
 [dependencies]
@@ -35,31 +35,31 @@ anyhow = { workspace = true }
 engine_core = { path = "../engine_core" }
 ```
 
-### 4. 依存方向の確認
-以下のルールに違反しないことを確認:
-- `engine_core` は他の内部クレートに依存しない
-- `script_editor` と `game_player` は互いに依存しない
-- 循環依存は厳禁
+### 4. Verify dependency direction
+Ensure the following rules are respected:
+- `engine_core` must not depend on other internal crates.
+- `script_editor` and `game_player` must not depend on each other.
+- Circular dependencies are prohibited.
 
-### 5. ビルド検証
+### 5. Build validation
 ```bash
 cargo build --workspace
 ```
 
-### 6. テスト検証
+### 6. Test validation
 ```bash
 cargo test -p {crate_name}
 ```
 
-### 7. ドキュメント
-- 新クレートの `lib.rs` にモジュールレベルの `//!` doc コメントを記述
-- README.md のクレート構成セクションに説明を追記
-- `GEMINI.md` の Crate Structure セクションに追記
+### 7. Documentation
+- Add a module-level `//!` doc comment to the new crate's `lib.rs`.
+- Update the crate structure section in `README.md`.
+- Update the Crate Structure section in `GEMINI.md`.
 
-## チェックリスト
-- [ ] `crates/{name}/` 作成済み
-- [ ] ルート `Cargo.toml` に登録済み
-- [ ] 依存方向ルール遵守
-- [ ] `cargo build --workspace` 成功
-- [ ] `cargo test -p {name}` 成功
-- [ ] ドキュメント更新済み
+## Checklist
+- [ ] `crates/{name}/` created
+- [ ] Added to root `Cargo.toml`
+- [ ] Dependency-direction rules satisfied
+- [ ] `cargo build --workspace` passes
+- [ ] `cargo test -p {name}` passes
+- [ ] Documentation updated

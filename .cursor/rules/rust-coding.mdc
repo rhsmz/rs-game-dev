@@ -1,29 +1,29 @@
 ---
-description: Rust コーディング規約
+description: Rust coding conventions
 globs: **/*.rs
 alwaysApply: true
 ---
 
-# Rust コーディング規約
+# Rust Coding Conventions
 
-## 命名規則
+## Naming Rules
 
-| 対象 | 形式 | 例 |
+| Target | Format | Example |
 |------|------|-----|
-| クレート名 | `snake_case` | `engine_core` |
-| モジュール・ファイル | `snake_case` | `scene_manager.rs` |
-| 構造体・列挙型・トレイト | `PascalCase` | `SceneManager`, `CharaType` |
-| 関数・メソッド・変数 | `snake_case` | `load_scene()`, `chara_id` |
-| 定数 | `SCREAMING_SNAKE_CASE` | `MAX_ENTITIES` |
-| 型パラメータ | 1文字大文字 or 意味的名称 | `T`, `S: System` |
-| ライフタイム | 短い小文字 | `'a`, `'ctx` |
+| Crate names | `snake_case` | `engine_core` |
+| Modules/files | `snake_case` | `scene_manager.rs` |
+| Structs/enums/traits | `PascalCase` | `SceneManager`, `CharaType` |
+| Functions/methods/variables | `snake_case` | `load_scene()`, `chara_id` |
+| Constants | `SCREAMING_SNAKE_CASE` | `MAX_ENTITIES` |
+| Type parameters | Single capital letter or semantic name | `T`, `S: System` |
+| Lifetimes | Short lowercase names | `'a`, `'ctx` |
 
-## エラーハンドリング
+## Error Handling
 
-- ライブラリクレート: `thiserror` で型付きエラーを定義
-- アプリケーションクレート: `anyhow` で簡潔なエラー伝播
-- `unwrap()` / `expect()` は本番コードで原則禁止（テスト・初期化の明示的パニックのみ許可）
-- エラー型はモジュールごとに `error.rs` に集約
+- Library crates: define typed errors with `thiserror`.
+- Application crates: use `anyhow` for concise error propagation.
+- `unwrap()` / `expect()` are forbidden in production code (only allowed for explicit panics in tests/initialization).
+- Consolidate error types in `error.rs` per module.
 
 ```rust
 // ✅ Good
@@ -39,30 +39,30 @@ pub enum AssetError {
 
 // ❌ Bad
 fn load() {
-    let data = std::fs::read("file").unwrap(); // パニックの危険
+    let data = std::fs::read("file").unwrap(); // panic risk
 }
 ```
 
-## `unsafe` ルール
+## `unsafe` Rules
 
-- `unsafe` は FFI 境界（Live2D SDK, Filament API）のみに限定
-- すべての `unsafe` ブロックに `// SAFETY:` コメントで安全性の根拠を記述
-- `unsafe` ラッパーは専用モジュール（`ffi/`）に隔離し、安全な公開 API でラップ
+- Restrict `unsafe` to FFI boundaries only (Live2D SDK, Filament API).
+- Every `unsafe` block must have a `// SAFETY:` comment justifying soundness.
+- Isolate `unsafe` wrappers in dedicated modules (`ffi/`) and expose safe public APIs.
 
 ```rust
-// SAFETY: Filament の Engine::create は null チェック済み。
-// エンジンのライフタイムはアプリケーションと同一。
+// SAFETY: Filament Engine::create is null-checked.
+// The engine lifetime is tied to the application lifetime.
 unsafe {
     let engine = filament_sys::Engine_create();
     assert!(!engine.is_null());
 }
 ```
 
-## Lint & フォーマット
+## Linting and Formatting
 
-- `cargo fmt -- --check` を常に通すこと
-- `cargo clippy -- -D warnings` で警告をエラー扱い
-- 推奨 Clippy lint グループ:
+- Always pass `cargo fmt -- --check`.
+- Treat warnings as errors via `cargo clippy -- -D warnings`.
+- Recommended Clippy lint groups:
 
 ```toml
 # Cargo.toml (workspace)
@@ -73,24 +73,24 @@ unwrap_used = "deny"
 expect_used = "warn"
 ```
 
-## ドキュメンテーション
+## Documentation
 
-- 公開 API (`pub`) にはすべて `///` doc コメントを付与
-- モジュールレベルで `//!` を用いた概要説明を記載
-- コード内の複雑なロジックには `//` コメントで意図を説明
-- `# Examples` セクションを doc コメントに含め、`cargo test --doc` で検証可能に
+- Add `///` doc comments to all public APIs (`pub`).
+- Add module-level overviews using `//!`.
+- Explain intent for complex logic with `//` comments.
+- Include an `# Examples` section in doc comments and keep it verifiable via `cargo test --doc`.
 
-## モジュール構成
+## Module Structure
 
-- 1ファイル 400行 以下を目安にモジュール分割
-- `mod.rs` は re-export のみ、ロジックを書かない
-- 可視性は最小限（`pub(crate)` → `pub(super)` → `pub`）
+- Split modules at around 400 lines per file.
+- Keep `mod.rs` for re-exports only; no business logic.
+- Minimize visibility (`pub(crate)` -> `pub(super)` -> `pub`).
 
-## テスト
+## Tests
 
-- ユニットテスト: 同一ファイル内の `#[cfg(test)] mod tests`
-- 統合テスト: `tests/` ディレクトリ
-- テスト関数名は `test_<対象>_<条件>_<期待結果>` 形式
+- Unit tests: `#[cfg(test)] mod tests` in the same file.
+- Integration tests: under `tests/` directory.
+- Test function naming: `test_<target>_<condition>_<expected_result>`.
 
 ```rust
 #[cfg(test)]
@@ -105,20 +105,20 @@ mod tests {
 }
 ```
 
-## 型システム活用
+## Leverage the Type System
 
-- 状態遷移は列挙型 + 型状態パターンで表現
-- `newtype` パターンでプリミティブ型の誤用を防止
-- Generics に適切なトレイト境界を設定
+- Represent state transitions with enums + typestate patterns.
+- Use `newtype` to prevent misuse of primitive types.
+- Apply appropriate trait bounds to generics.
 
 ```rust
-// ✅ newtype でドメイン型を明確に
+// ✅ Clarify domain types with newtype
 pub struct CharaId(pub String);
 pub struct SoundId(pub String);
 ```
 
-## 並行処理
+## Concurrency
 
-- スレッド間共有は `Arc<Mutex<T>>` より `mpsc::channel` (メッセージパッシング) を優先
-- ECS の System 間データ受け渡しは ECS フレームワーク機構を利用
-- `Send + Sync` 境界を意識したデータ設計
+- Prefer `mpsc::channel` (message passing) over `Arc<Mutex<T>>` for cross-thread sharing.
+- Use ECS framework mechanisms for inter-system data transfer.
+- Design data with `Send + Sync` boundaries in mind.

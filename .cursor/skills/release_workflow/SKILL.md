@@ -1,64 +1,64 @@
 ---
 name: release_workflow
-description: リリースビルドと配布パッケージ作成手順を案内する。バージョン更新から `cargo build --release`、配布アセットアーカイブ作成、配布物構成確認まで行いたいときに使用する。
+description: Guides release builds and distribution packaging from version bump through asset archive creation.
 ---
 
-# リリースワークフロー
+# Release Workflow
 
-## 前提条件
-- 全テストがパスしていること（`/test` ワークフロー参照）
-- バージョン番号が更新済みであること
+## Prerequisites
+- All tests pass (see test workflow).
+- Version number has been updated.
 
-## 手順
+## Steps
 
-### 1. バージョン更新
-各クレートの `Cargo.toml` のバージョンを更新する。セマンティックバージョニングに従う。
+### 1. Update versions
+Update versions in each crate's `Cargo.toml` following semantic versioning.
 
 ```toml
 [package]
 version = "X.Y.Z"
 ```
 
-### 2. 全テスト実行
+### 2. Run all tests
 ```bash
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
-### 3. リリースビルド
+### 3. Build release
 ```bash
 cargo build --workspace --release
 ```
 
-### 4. game_player の配布バイナリ確認
+### 4. Verify `game_player` distribution binary
 ```bash
 ls target/release/game_player*
 ```
 
-リリースバイナリは `target/release/` に生成される。
+Release binaries are generated under `target/release/`.
 
-### 5. アセットアーカイブ作成
-配布用に `assets/` ディレクトリをアーカイブ化する。
+### 5. Create asset archive
+Archive the `assets/` directory for distribution.
 
 ```bash
 cargo run -p game_player --release -- --pack-assets ./assets -o ./dist/assets.pak
 ```
 
-### 6. 配布パッケージ構成
+### 6. Distribution package structure
 ```text
 dist/
-├── game_player.exe    # (Windows) メインバイナリ
-├── assets.pak         # アセットアーカイブ
-├── config.toml        # ランタイム設定
-└── README.txt         # ユーザー向け説明
+├── game_player.exe    # (Windows) main binary
+├── assets.pak         # asset archive
+├── config.toml        # runtime settings
+└── README.txt         # user-facing notes
 ```
 
-### 7. Git タグ作成
+### 7. Create Git tag
 ```bash
 git tag -a v{VERSION} -m "Release v{VERSION}"
 git push origin v{VERSION}
 ```
 
-## バージョニングルール
-- MAJOR: 破壊的変更（セーブデータ互換性の喪失など）
-- MINOR: 新機能追加（後方互換）
-- PATCH: バグ修正
+## Versioning Rules
+- MAJOR: breaking changes (e.g., save-data compatibility loss).
+- MINOR: new backward-compatible features.
+- PATCH: bug fixes.

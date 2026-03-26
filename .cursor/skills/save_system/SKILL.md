@@ -1,34 +1,34 @@
 ---
 name: save_system
-description: MessagePack ベースのセーブ/ロードシステム実装スキル
+description: MessagePack-based save/load system implementation skill
 ---
 
-# セーブシステム実装スキル
-## 概要
-ゲームの進行状態を MessagePack 形式 (`rmp-serde`) でシリアライズ/デシリアライズする。セーブデータにはスクリプト位置、グローバル変数、Live2D/3D 状態、ミニゲームデータ、サムネイルを含む。
+# Save System Implementation Skill
+## Overview
+Serialize/deserialize game progress using MessagePack (`rmp-serde`). Save data includes script position, global variables, Live2D/3D state, minigame data, and thumbnails.
 
-## セーブデータ構造
+## Save Data Structure
 ```rust
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct SaveFile {
-    /// セーブデータフォーマットバージョン（マイグレーション用）
+    /// Save data format version (for migration)
     pub version: u32,
-    /// セーブ日時（UNIX タイムスタンプ）
+    /// Save timestamp (UNIX timestamp)
     pub timestamp: u64,
-    /// スクリプト位置（ファイル名, 行番号）
+    /// Script position (file name, line number)
     pub script_pos: (String, usize),
-    /// グローバル変数（好感度、フラグ等）
+    /// Global variables (affinity, flags, etc.)
     pub global_vars: HashMap<String, i32>,
-    /// Live2D パラメータ状態（ポーズ復元用）
+    /// Live2D parameter state (for pose restoration)
     pub live2d_state: Vec<Param>,
-    /// ミニゲーム固有のシリアライズデータ
+    /// Serialized minigame-specific data
     pub mini_game_blob: Vec<u8>,
-    /// サムネイル画像（JPEG バイナリ）
+    /// Thumbnail image (JPEG binary)
     pub thumbnail: Option<Vec<u8>>,
-    /// LogicRng シード状態（リプレイ再現用）
+    /// LogicRng seed state (for replay reproducibility)
     pub rng_seed: [u8; 32],
 }
 
@@ -39,12 +39,12 @@ pub struct Param {
 }
 ```
 
-## シリアライズ / デシリアライズ
+## Serialization / Deserialization
 ```rust
-/// MessagePack シリアライズ（フィールド名付きで互換性確保）
+/// MessagePack serialization (named fields for version compatibility)
 pub fn save_to_bytes(save: &SaveFile) -> Result<Vec<u8>, SaveError> {
-    // to_vec_named: フィールド名を保持（バージョン間互換性に有利）
-    // to_vec: コンパクト配列形式（サイズ優先の場合）
+    // to_vec_named: preserve field names (better cross-version compatibility)
+    // to_vec: compact array format (size-first use case)
     rmp_serde::to_vec_named(save).map_err(SaveError::Serialize)
 }
 
@@ -53,7 +53,7 @@ pub fn load_from_bytes(data: &[u8]) -> Result<SaveFile, SaveError> {
 }
 ```
 
-## ファイル I/O
+## File I/O
 ```rust
 use std::path::Path;
 
@@ -69,7 +69,7 @@ pub fn load_from_file(path: &Path) -> Result<SaveFile, SaveError> {
 }
 ```
 
-## セーブスロット管理
+## Save Slot Management
 ```rust
 pub struct SaveManager {
     save_dir: PathBuf,
@@ -81,26 +81,26 @@ impl SaveManager {
         Self { save_dir, max_slots }
     }
 
-    /// スロット一覧取得（サムネイル・日時付き）
+    /// List save slots (with thumbnail and timestamp)
     pub fn list_slots(&self) -> Result<Vec<SaveSlotInfo>, SaveError> {
-        // save_dir 内の .sav ファイルをスキャン
-        // ヘッダーのみ読み込んでサムネイル・日時を返す
+        // Scan .sav files under save_dir
+        // Read header only and return thumbnail/timestamp
         todo!()
     }
 
-    /// 指定スロットにセーブ
+    /// Save to specific slot
     pub fn save(&self, slot: usize, save: &SaveFile) -> Result<(), SaveError> {
         let path = self.save_dir.join(format!("slot_{:03}.sav", slot));
         save_to_file(save, &path)
     }
 
-    /// 指定スロットからロード
+    /// Load from specific slot
     pub fn load(&self, slot: usize) -> Result<SaveFile, SaveError> {
         let path = self.save_dir.join(format!("slot_{:03}.sav", slot));
         load_from_file(&path)
     }
 
-    /// オートセーブ
+    /// Auto save
     pub fn auto_save(&self, save: &SaveFile) -> Result<(), SaveError> {
         let path = self.save_dir.join("auto_save.sav");
         save_to_file(save, &path)
@@ -108,24 +108,24 @@ impl SaveManager {
 }
 ```
 
-## バージョンマイグレーション
-セーブデータの `version` フィールドでフォーマット変更に対応。
+## Version Migration
+Handle format changes via the `version` field in save data.
 ```rust
 pub fn migrate(mut save: SaveFile) -> Result<SaveFile, SaveError> {
     match save.version {
         1 => {
-            // v1 → v2: rng_seed フィールド追加
-            // デフォルト値をセット
+            // v1 -> v2: add rng_seed field
+            // Set default values
             save.version = 2;
-            migrate(save)  // 再帰的にチェーン
+            migrate(save)  // recursive migration chain
         }
-        2 => Ok(save),  // 最新バージョン
+        2 => Ok(save),  // latest version
         _ => Err(SaveError::UnsupportedVersion(save.version)),
     }
 }
 ```
 
-## エラー型
+## Error Type
 ```rust
 use thiserror::Error;
 
@@ -142,37 +142,36 @@ pub enum SaveError {
 }
 ```
 
-## サムネイル生成
-セーブ時に現在のゲーム画面をキャプチャし、JPEG でエンコードしてセーブデータに含める。
+## Thumbnail Generation
+Capture the current game screen on save, encode as JPEG, and include in save data.
 ```rust
 pub fn capture_thumbnail(renderer: &Renderer, width: u32, height: u32) -> Vec<u8> {
-    // Filament のフレームバッファを読み取り
-    // リサイズ（128x72 等の低解像度）
-    // JPEG エンコード
+    // Read Filament framebuffer
+    // Resize (e.g., low resolution 128x72)
+    // JPEG encode
     todo!()
 }
 ```
 
-## ECS 連携
+## ECS Integration
 ```rust
 pub enum SaveCommand {
-    Save(usize),       // スロット番号
+    Save(usize),       // slot number
     Load(usize),
     AutoSave,
     QuickSave,
     QuickLoad,
 }
 
-// セーブ System
-pub fn save_system(/* ECS クエリ */) {
-    // SaveCommand をチェック
-    // 現在の ECS 状態から SaveFile を構築
-    // SaveManager 経由でファイルに書き出し
+// Save system
+pub fn save_system(/* ECS query */) {
+    // Check SaveCommand
+    // Build SaveFile from current ECS state
+    // Write file through SaveManager
 }
 ```
 
-## 注意事項
-- セーブデータには機密情報を含めない（チート対策は別途検討）
-- ロード時は必ず `migrate()` を通してバージョン互換性を確保
-- サムネイル画像は圧縮品質 70% 程度でファイルサイズを抑制
-
+## Notes
+- Do not include sensitive data in save files (anti-cheat strategy is separate).
+- Always run `migrate()` on load to ensure version compatibility.
+- Use around 70% thumbnail compression quality to control file size.

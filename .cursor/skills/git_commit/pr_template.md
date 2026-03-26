@@ -1,18 +1,17 @@
-## 概要
+## Summary
 
-<!-- このPRで何をしたか、なぜ必要か -->
+<!-- What this PR changes and why it is needed -->
 
-## 変更内容
+## Changes
 
 - [ ] 
 
-## テスト方法
+## Test Plan
 
 ```bash
 cargo test
 ```
 
-## 関連 Issue
+## Related Issue
 
-<!-- Closes #<番号> -->
-
+<!-- Closes #<number> -->

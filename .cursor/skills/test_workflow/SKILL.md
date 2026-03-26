@@ -1,57 +1,57 @@
 ---
 name: test_workflow
-description: プロジェクトのテスト・品質チェック手順（`cargo fmt` / `cargo clippy` / `cargo test`）を案内する。フォーマットや静的解析、ユニットテストを実行したいときに使用する。
+description: Guides test and quality checks (cargo fmt, cargo clippy, cargo test) for formatting, static analysis, and unit tests.
 ---
 
-# テストワークフロー
+# Test Workflow
 
-## 手順
+## Steps
 
-### 1. フォーマットチェック
+### 1. Format check
 ```bash
 cargo fmt --all -- --check
 ```
 
-フォーマットが崩れている場合は自動修正:
+Auto-fix if formatting is broken:
 ```bash
 cargo fmt --all
 ```
 
-### 2. Clippy (静的解析)
+### 2. Clippy (static analysis)
 ```bash
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-### 3. ユニットテスト
+### 3. Unit tests
 ```bash
 cargo test --workspace
 ```
 
-### 4. 特定クレートのテスト
+### 4. Test specific crates
 ```bash
 cargo test -p engine_core
 cargo test -p script_editor
 cargo test -p game_player
 ```
 
-### 5. ドキュメンテーションテスト
+### 5. Documentation tests
 ```bash
 cargo test --workspace --doc
 ```
 
-### 6. 統合テスト
+### 6. Integration tests
 ```bash
 cargo test --workspace --test '*'
 ```
 
-### 7. 全チェック一括実行
+### 7. Run all checks in one command
 ```bash
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
-## テスト記述ルール
-- テスト関数名: `test_<対象>_<条件>_<期待結果>`
-- ユニットテスト: 同一ファイルの `#[cfg(test)] mod tests` 内に記述
-- 統合テスト: `tests/` ディレクトリに配置
-- ECS 関連テストはモック World を作成して実行
-- FFI 境界のテストは `#[ignore]` アトリビュートで通常実行から除外可能に
+## Test writing rules
+- Test function name: `test_<target>_<condition>_<expected_result>`.
+- Unit tests: write in `#[cfg(test)] mod tests` within the same file.
+- Integration tests: place under `tests/` directory.
+- ECS-related tests should run against a mocked World.
+- FFI-boundary tests can be excluded from normal runs with `#[ignore]`.

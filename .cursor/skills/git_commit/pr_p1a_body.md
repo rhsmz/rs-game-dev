@@ -1,21 +1,20 @@
-## 概要
+## Summary
 
-フェイズ1（ワークスペース初期化）の p1a として、ルートの `Cargo.toml` とワークスペースメンバー（engine_core, script_editor, game_player）を定義した。既存の develop には同内容が含まれているため、本 PR は履歴整理・計画との対応付け用です。
+As p1a of Phase 1 (workspace initialization), this PR defines the root `Cargo.toml` and workspace members (`engine_core`, `script_editor`, `game_player`). Since the same content already exists in `develop`, this PR is for history alignment and plan traceability.
 
-## 変更内容
+## Changes
 
-- [x] ルート `Cargo.toml` に `[workspace]` と `members` を定義
-- [x] `resolver = "2"`、`[workspace.package]`（version, edition, license, rust-version）を設定
-- [x] `[workspace.dependencies]` で共通依存（serde, rmp-serde, anyhow, thiserror, log, env_logger）を定義
-- [x] `[workspace.lints.clippy]` で Clippy の共通リント設定を定義
+- [x] Defined `[workspace]` and `members` in root `Cargo.toml`
+- [x] Set `resolver = "2"` and `[workspace.package]` (version, edition, license, rust-version)
+- [x] Defined shared dependencies in `[workspace.dependencies]` (serde, rmp-serde, anyhow, thiserror, log, env_logger)
+- [x] Defined shared Clippy lint settings in `[workspace.lints.clippy]`
 
-## テスト方法
+## Test Plan
 
 ```bash
 cargo check --workspace
 ```
 
-## 関連 Issue
+## Related Issue
 
-<!-- 該当する Issue があれば Closes #<番号> -->
-
+<!-- If applicable: Closes #<number> -->

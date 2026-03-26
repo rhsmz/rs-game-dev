@@ -1,62 +1,62 @@
 ---
 name: scene_creation
-description: Scene トレイト実装およびシーン遷移の作成スキル
+description: Skill for implementing the Scene trait and creating scene transitions
 ---
 
-# Scene 作成スキル
-## 概要
-本エンジンの全ゲームパート（ADVパート、ミニゲーム、タイトル画面等）は `Scene` トレイトを実装する。このスキルでは新しいシーンの作成手順とベストプラクティスを定義する。
+# Scene Creation Skill
+## Overview
+All game parts in this engine (ADV part, minigames, title screen, etc.) implement the `Scene` trait. This skill defines creation steps and best practices for new scenes.
 
-## Scene トレイト定義
+## Scene Trait Definition
 ```rust
 use crate::asset::AssetDescriptor;
 use crate::scene::{SceneContext, RenderContext, SceneTransition};
 
 pub trait Scene: Send + Sync {
-    /// シーンの初期化（アセットロード完了後に呼ばれる）
+    /// Initialize scene (called after asset loading completes)
     fn on_enter(&mut self, ctx: &mut SceneContext);
 
-    /// 毎フレーム更新。次のシーン遷移を返す。
+    /// Per-frame update. Returns the next scene transition.
     fn update(&mut self, ctx: &mut SceneContext, dt: f32) -> SceneTransition;
 
-    /// 描画コマンドの発行
+    /// Issue render commands
     fn render(&self, ctx: &RenderContext);
 
-    /// シーン終了時のクリーンアップ
+    /// Cleanup when leaving the scene
     fn on_exit(&mut self, ctx: &mut SceneContext);
 
-    /// このシーンで必要なアセット一覧（事前ロード用）
+    /// Assets required by this scene (for preloading)
     fn required_assets(&self) -> Vec<AssetDescriptor>;
 }
 ```
 
-## SceneTransition 列挙型
+## SceneTransition Enum
 ```rust
 pub enum SceneTransition {
-    /// 現シーンを継続
+    /// Continue current scene
     None,
-    /// 指定シーンに遷移
+    /// Transition to specified scene
     Push(Box<dyn Scene>),
-    /// 現シーンを終了して前シーンに戻る
+    /// End current scene and return to previous scene
     Pop,
-    /// 現シーンを破棄して指定シーンに置換
+    /// Discard current scene and replace with specified scene
     Replace(Box<dyn Scene>),
-    /// ゲーム終了
+    /// Quit game
     Quit,
 }
 ```
 
-## 新シーン作成手順
+## New Scene Creation Steps
 
-### 1. ファイル作成
+### 1. Create file
 
-`crates/engine_core/src/scene/` にシーンモジュールを作成。
+Create a scene module under `crates/engine_core/src/scene/`.
 
 ```rust
 // crates/engine_core/src/scene/title_scene.rs
 
 pub struct TitleScene {
-    // シーン固有のステート
+    // Scene-specific state
 }
 
 impl TitleScene {
@@ -67,52 +67,51 @@ impl TitleScene {
 
 impl Scene for TitleScene {
     fn on_enter(&mut self, ctx: &mut SceneContext) {
-        // BGM再生、UIセットアップ等
+        // Play BGM, setup UI, etc.
     }
 
     fn update(&mut self, ctx: &mut SceneContext, dt: f32) -> SceneTransition {
-        // 入力チェック → シーン遷移判定
+        // Check input -> decide scene transition
         SceneTransition::None
     }
 
     fn render(&self, ctx: &RenderContext) {
-        // 描画コマンド発行
+        // Issue render commands
     }
 
     fn on_exit(&mut self, ctx: &mut SceneContext) {
-        // リソース解放
+        // Release resources
     }
 
     fn required_assets(&self) -> Vec<AssetDescriptor> {
         vec![
-            // 必要アセットを列挙
+            // List required assets
         ]
     }
 }
 ```
 
-### 2. モジュール登録
-`crates/engine_core/src/scene/mod.rs` に追加。
+### 2. Register module
+Add it to `crates/engine_core/src/scene/mod.rs`.
 
-### 3. テスト
-- `on_enter` → `update` → `on_exit` のライフサイクルが正しく動作することを確認
-- `SceneTransition` の各バリアントが正しく処理されることを確認
+### 3. Tests
+- Verify lifecycle: `on_enter` -> `update` -> `on_exit`.
+- Verify each `SceneTransition` variant is handled correctly.
 
-## シーン遷移フロー
+## Scene Transition Flow
 ```
-現シーン.on_exit()
-    ↓
-アセット完全パージ
-    ↓
-新シーン.required_assets() → 非同期ロード
-    ↓
-ロード完了後、新シーン.on_enter()
-    ↓
-メインループで新シーン.update() / render()
+current_scene.on_exit()
+    |
+full asset purge
+    |
+new_scene.required_assets() -> async load
+    |
+after loading, new_scene.on_enter()
+    |
+main loop calls new_scene.update() / render()
 ```
 
-## ベストプラクティス
-- シーン固有の ECS Component/System はシーンの `on_enter` で登録、`on_exit` で削除
-- 重いアセットは `required_assets()` で事前宣言し、ロード画面で非同期ロード
-- シーン間のデータ受け渡しは `SceneContext` 経由のメッセージパッシングで行う
-
+## Best Practices
+- Register scene-specific ECS components/systems in `on_enter`, remove them in `on_exit`.
+- Declare heavy assets in `required_assets()` and load asynchronously on a loading screen.
+- Pass data between scenes via message passing through `SceneContext`.

@@ -1,36 +1,36 @@
 ---
-description: プロジェクト概要・技術スタック・全体方針
+description: Project overview, tech stack, and core principles
 alwaysApply: true
 ---
-# プロジェクト概要
+# Project Overview
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| **名称** | rs-game-dev |
-| **概要** | Rust 製アドベンチャーゲームエンジン。ビジュアルノベルコアにミニゲーム（2D/3Dアクション、RPG、パズル、RTS）を統合するプラグイン型アーキテクチャ。 |
-| **言語** | Rust |
-| **ビルドツール** | Cargo (workspace) |
-| **参考作品** | 恋姫†無双 (Koihime Musō)、TWINKLE CRUSADERS |
+| **Name** | rs-game-dev |
+| **Summary** | A Rust adventure game engine with a visual-novel core and plugin-based minigames (2D/3D action, RPG, puzzle, RTS). |
+| **Language** | Rust |
+| **Build Tool** | Cargo (workspace) |
+| **References** | Koihime Musou, TWINKLE CRUSADERS |
 
-## 技術スタック
+## Tech Stack
 
-| カテゴリ | 技術 |
+| Category | Technology |
 |---|---|
-| **レンダラー** | Google Filament (PBR, IBL, ポストプロセス) |
-| **2D キャラクター** | Live2D Cubism Native SDK (C++ → Rust FFI) |
-| **3D キャラクター** | VRM / FBX (SpringBone, BlendShape, GLB変換) |
-| **UI レイアウト** | Taffy (Flexbox) + Signal駆動リアクティブ (Floem思想) |
-| **UI レンダリング** | SDF テキスト、Glassmorphism マテリアル |
-| **オーディオ** | `kira` or `rodio` (BGM/SE/Voice ミキシング) |
-| **ECS** | 自作 Entity Component System |
-| **シリアライズ** | `serde`, `rmp-serde` (MessagePack), CSV メタデータ |
-| **スクリプト** | タグベース独自スクリプト構文 (パーサ + ステートマシン) |
-| **RNG** | Xoshiro256++ (演出用) / ChaCha8 (ロジック・リプレイ用) |
+| **Renderer** | Google Filament (PBR, IBL, post-processing) |
+| **2D Characters** | Live2D Cubism Native SDK (C++ -> Rust FFI) |
+| **3D Characters** | VRM / FBX (SpringBone, BlendShape, GLB conversion) |
+| **UI Layout** | Taffy (Flexbox) + signal-driven reactivity (Floem-inspired) |
+| **UI Rendering** | SDF text, Glassmorphism materials |
+| **Audio** | `kira` or `rodio` (BGM/SE/Voice mixing) |
+| **ECS** | Custom Entity Component System |
+| **Serialization** | `serde`, `rmp-serde` (MessagePack), CSV metadata |
+| **Script** | Tag-based custom script syntax (parser + state machine) |
+| **RNG** | Xoshiro256++ (visual effects) / ChaCha8 (logic/replay) |
 
-## 全体方針
+## Core Principles
 
-- Rust のメモリ安全性・借用チェッカーを尊重し `unsafe` は FFI 境界のみに限定
-- `clippy` / `rustfmt` を常に適用
-- ECS と UI を直接参照せずメッセージパッシングで疎結合に連携
-- ミニゲームは `Scene` トレイトを実装した独立プラグインとして追加
-- セーブデータは MessagePack 形式 (`rmp-serde`)
+- Respect Rust memory safety and borrowing rules; restrict `unsafe` to FFI boundaries.
+- Always enforce `clippy` and `rustfmt`.
+- Keep ECS and UI loosely coupled via message passing, not direct references.
+- Add minigames as independent plugins implementing the `Scene` trait.
+- Store save data in MessagePack format (`rmp-serde`).
