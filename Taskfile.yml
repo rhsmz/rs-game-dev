@@ -1,0 +1,200 @@
+# https://taskfile.dev
+version: "3"
+
+# ═══════════════════════════════════════════════════════════════
+#  ビルドモードの使い分け
+#  ┌──────────┬─────────────────────────────────────────────────┐
+#  │ task dev │ デバッグ CI（プロダクションコードのみ lint）     │
+#  │          │ → 日常開発・コミット前チェックに使う             │
+#  ├──────────┼─────────────────────────────────────────────────┤
+#  │ task     │ リリース CI（テストコードを含む全ターゲット lint） │
+#  │ release  │ → マージ前・リリース時に使う                     │
+#  └──────────┴─────────────────────────────────────────────────┘
+# ═══════════════════════════════════════════════════════════════
+
+vars:
+  WORKSPACE_FLAGS: --workspace
+  ENGINE_CRATE: engine_core
+  EDITOR_CRATE: script_editor
+  PLAYER_CRATE: game_player
+
+tasks:
+  # ─── デフォルト ────────────────────────────────────────────────
+  default:
+    desc: "利用可能なタスク一覧を表示する"
+    cmds:
+      - task --list
+
+  # ─── ビルド ────────────────────────────────────────────────────
+  build:
+    desc: "[DEBUG] ワークスペース全体をデバッグビルドする"
+    cmds:
+      - cargo build {{.WORKSPACE_FLAGS}}
+
+  build:release:
+    desc: "[RELEASE] ワークスペース全体をリリースビルドする"
+    cmds:
+      - cargo build {{.WORKSPACE_FLAGS}} --release
+
+  build:engine:
+    desc: "[DEBUG] engine_core クレートのみビルドする"
+    cmds:
+      - cargo build -p {{.ENGINE_CRATE}}
+
+  build:editor:
+    desc: "[DEBUG] script_editor クレートのみビルドする"
+    cmds:
+      - cargo build -p {{.EDITOR_CRATE}}
+
+  build:player:
+    desc: "[DEBUG] game_player クレートのみビルドする"
+    cmds:
+      - cargo build -p {{.PLAYER_CRATE}}
+
+  # ─── フォーマット ──────────────────────────────────────────────
+  fmt:
+    desc: "コードフォーマットを自動適用する（cargo fmt）"
+    cmds:
+      - cargo fmt --all
+
+  fmt:check:
+    desc: "フォーマット違反を検査する（修正しない）"
+    cmds:
+      - cargo fmt --all -- --check
+
+  # ─── Lint（2 段階） ────────────────────────────────────────────
+  lint:
+    desc: "[DEBUG] Clippy 解析（lib/bin のみ、テストコード除外）"
+    cmds:
+      - cargo clippy {{.WORKSPACE_FLAGS}} -- -D warnings
+
+  lint:strict:
+    desc: "[RELEASE] Clippy 解析（--all-targets、テストコード含む）"
+    cmds:
+      - cargo clippy {{.WORKSPACE_FLAGS}} --all-targets -- -D warnings
+
+  lint:engine:
+    desc: "[DEBUG] engine_core の Clippy を実行する"
+    cmds:
+      - cargo clippy -p {{.ENGINE_CRATE}} -- -D warnings
+
+  check:
+    desc: "ビルドエラーのみ確認する（cargo check）"
+    cmds:
+      - cargo check {{.WORKSPACE_FLAGS}} --all-targets
+
+  # ─── テスト ────────────────────────────────────────────────────
+  test:
+    desc: "ワークスペース全体のユニットテストを実行する"
+    cmds:
+      - cargo test {{.WORKSPACE_FLAGS}}
+
+  test:engine:
+    desc: "engine_core のテストを実行する"
+    cmds:
+      - cargo test -p {{.ENGINE_CRATE}}
+
+  test:editor:
+    desc: "script_editor のテストを実行する"
+    cmds:
+      - cargo test -p {{.EDITOR_CRATE}}
+
+  test:player:
+    desc: "game_player のテストを実行する"
+    cmds:
+      - cargo test -p {{.PLAYER_CRATE}}
+
+  test:doc:
+    desc: "ドキュメントテストを実行する"
+    cmds:
+      - cargo test {{.WORKSPACE_FLAGS}} --doc
+
+  test:ignored:
+    desc: "ignored テスト（FFI/音声デバイス依存）を実行する"
+    cmds:
+      - cargo test {{.WORKSPACE_FLAGS}} -- --include-ignored
+
+  # ─── CI チェック（2 段階） ─────────────────────────────────────
+  ci:
+    desc: "[DEBUG] デバッグ CI（fmt:check → lint → test）"
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
+
+  ci:release:
+    desc: "[RELEASE] リリース CI（fmt:check → lint:strict → test）"
+    cmds:
+      - task: fmt:check
+      - task: lint:strict
+      - task: test
+
+  # ─── コミット前確認 ────────────────────────────────────────────
+  pre-commit:
+    desc: "[DEBUG] コミット前チェック（fmt 自動修正 → lint → test）"
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+
+  # ─── 起動 ──────────────────────────────────────────────────────
+  run:
+    desc: "[DEBUG] game_player をデバッグモードで起動する"
+    cmds:
+      - cargo run -p {{.PLAYER_CRATE}}
+
+  run:editor:
+    desc: "[DEBUG] script_editor をデバッグモードで起動する"
+    cmds:
+      - cargo run -p {{.EDITOR_CRATE}}
+
+  run:release:
+    desc: "[RELEASE] game_player をリリースモードで起動する"
+    cmds:
+      - cargo run -p {{.PLAYER_CRATE}} --release
+
+  # ─── デバッグビルド一式 ────────────────────────────────────────
+  dev:
+    desc: "[DEBUG] デバッグ CI → デバッグビルド → game_player 起動"
+    cmds:
+      - task: ci
+      - task: run
+
+  # ─── リリースビルド一式 ────────────────────────────────────────
+  release:
+    desc: "[RELEASE] リリース CI → リリースビルド"
+    cmds:
+      - task: ci:release
+      - task: build:release
+
+  release:pack:
+    desc: "[RELEASE] アセットアーカイブ（.pak）を生成する"
+    cmds:
+      - cargo run -p {{.PLAYER_CRATE}} --release -- --pack-assets ./assets -o ./dist/assets.pak
+
+  # ─── ドキュメント ──────────────────────────────────────────────
+  doc:
+    desc: "API ドキュメントを生成してブラウザで開く"
+    cmds:
+      - cargo doc {{.WORKSPACE_FLAGS}} --no-deps --open
+
+  doc:build:
+    desc: "API ドキュメントを生成する（ブラウザを開かない）"
+    cmds:
+      - cargo doc {{.WORKSPACE_FLAGS}} --no-deps
+
+  # ─── ユーティリティ ────────────────────────────────────────────
+  clean:
+    desc: "ビルド成果物を削除する（cargo clean）"
+    cmds:
+      - cargo clean
+
+  deps:
+    desc: "依存クレートの更新確認を行う（cargo outdated）"
+    cmds:
+      - cargo outdated
+
+  audit:
+    desc: "セキュリティ脆弱性の監査を実行する（cargo audit）"
+    cmds:
+      - cargo audit
