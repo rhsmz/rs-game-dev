@@ -7,13 +7,16 @@ description: Semantic commit messages, phase-based feature branches, and PR work
 ## Overview
 This project uses **Semantic Commit Messages** and phase-based feature branches. Changes are merged into `main` through pull requests.
 
+**Important**: The `<summary>`, body, and footer of commit messages must be written in **Japanese**. Only `<type>` and `<scope>` remain in English.
+PR titles and body text must also be written in **Japanese**.
+
 ---
 ## 1. Commit Message Convention
 ### Format
 ```
-<type>(<scope>): <summary>
+<type>(<scope>): <summary in Japanese>
 
-[optional body]
+[optional body in Japanese]
 
 [optional footer]
 ```
@@ -55,25 +58,25 @@ This project uses **Semantic Commit Messages** and phase-based feature branches.
 
 ### Commit message examples
 ```
-feat(ecs): define core World/Entity/Component types
-fix(scene): fix asset leak after on_exit
-refactor(render): extract CommandBuffer construction into a function
-docs(agent): add git_commit skill
-build(workspace): add engine_core crate to Cargo.toml
-test(save): add save/load roundtrip tests
+feat(ecs): World・Entity・Component の基本型を定義
+fix(scene): on_exit 後にアセットが解放されない問題を修正
+refactor(render): CommandBuffer 生成処理を関数に抽出
+docs(agent): git_commit スキルを追加
+build(workspace): engine_core クレートを Cargo.toml に追加
+test(save): セーブ/ロードのラウンドトリップテストを追加
 ```
 
 ### Body and footer guidelines
 
-- Use the body to explain **why** the change was made when the summary alone is not enough.
+- Use the body to explain **why** the change was made when the summary alone is not enough. Write the body in **Japanese**.
 - For breaking changes, include a line starting with `BREAKING CHANGE:` in the body.
 - Reference related issues with `Closes #<number>` in the footer.
 
 ```
-feat(script): implement jump commands for tag-based script
+feat(script): タグベーススクリプトのジャンプ命令を実装
 
-Added goto/gosub commands needed for branching sequences.
-Uses state machine stack to manage gosub return points.
+分岐演出に必要な goto/gosub 命令を追加した。
+ステートマシンのスタックを利用して gosub の復帰先を管理する。
 
 Closes #42
 ```
@@ -124,33 +127,35 @@ git switch -c feature/<phase>/<task-description>
 ## 3. PR (Pull Request) Creation
 ### PR title
 
-Use the same format as commit messages.
+Use the same format as commit messages (summary in Japanese).
 
 ```
-feat(ecs): implement core ECS World/Entity/Component
+feat(ecs): ECS 基盤の World・Entity・Component を実装
 ```
 
 ### PR body template
 
+PR body must be written in **Japanese**.
+
 ```markdown
-## Summary
+## 概要
 
-<!-- What this PR changes and why it is needed -->
+<!-- このPRで何をしたか、なぜ必要か -->
 
-## Changes
+## 変更内容
 
-- [ ] Item 1
-- [ ] Item 2
+- [ ] 項目 1
+- [ ] 項目 2
 
-## Test Plan
+## テスト方法
 
 ```bash
 cargo test -p engine_core
 ```
 
-## Related Issue
+## 関連 Issue
 
-Closes #<number>
+Closes #<番号>
 ```
 
 ### Creating PR with GitHub CLI
@@ -161,7 +166,7 @@ git push -u origin feature/<phase>/<task-description>
 
 # Create PR (gh command)
 gh pr create \
-  --title "feat(ecs): implement core ECS World/Entity/Component" \
+  --title "feat(ecs): ECS 基盤の World・Entity・Component を実装" \
   --body-file .cursor/skills/git_commit/pr_template.md \
   --base main \
   --head feature/<phase>/<task-description>
