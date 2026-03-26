@@ -3,7 +3,7 @@
 //! BGM / SE / Voice の 3 トラック構成を用意する。
 
 use anyhow::anyhow;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use kira::sound::static_sound::StaticSoundData;
 use kira::sound::static_sound::StaticSoundHandle;
@@ -14,11 +14,20 @@ use kira::{
     AudioManager as KiraAudioManager, AudioManagerSettings, Decibels, DefaultBackend, Tween,
 };
 
+/// フェードアウト中のトラック。フェード完了推定時刻まで保持する。
+struct FadingTrack {
+    _handle: TrackHandle,
+    fade_done_at: Instant,
+}
+
 /// 音声管理（BGM / SE / Voice の 3 トラック）。
 #[allow(dead_code)]
 pub struct GameAudioManager {
     manager: KiraAudioManager<DefaultBackend>,
     bgm_track: TrackHandle,
+    /// フェードアウト中の旧 BGM トラック。
+    /// drop されるとトラックが即座に削除されるため、フェードアウト完了まで保持する。
+    fading_out_bgm_tracks: Vec<FadingTrack>,
     se_track: TrackHandle,
     voice_track: TrackHandle,
 }
@@ -39,7 +48,7 @@ impl GameAudioManager {
         let se_track = manager.add_sub_track(TrackBuilder::default()).map_err(|e| anyhow!(e))?;
         let voice_track = manager.add_sub_track(TrackBuilder::default()).map_err(|e| anyhow!(e))?;
 
-        Ok(Self { manager, bgm_track, se_track, voice_track })
+        Ok(Self { manager, bgm_track, fading_out_bgm_tracks: Vec::new(), se_track, voice_track })
     }
 
     /// 初期化済みかどうか（雛形）。
@@ -87,8 +96,9 @@ impl GameAudioManager {
 
     /// BGM をクロスフェードしながら切り替える（雛形）。
     ///
-    /// 現時点では「既存トラックをサイレンスへフェードアウト → 新規を play → IDENTITY へフェードイン」
-    /// という簡易モデルである。
+    /// 旧トラックをフェードアウトしつつ新トラックをフェードインする。
+    /// 旧 `TrackHandle` は `fading_out_bgm_tracks` に退避し、drop による即時削除を防ぐ。
+    /// 退避したトラックは次回クロスフェード時または [`purge_faded_tracks`] で解放する。
     ///
     /// # Errors
     /// - `TrackHandle::play` が失敗した場合
@@ -97,23 +107,34 @@ impl GameAudioManager {
         sound_data: StaticSoundData,
         fade_ms: u64,
     ) -> anyhow::Result<StaticSoundHandle> {
+        self.purge_faded_tracks();
+
         let tween = Tween { duration: Duration::from_millis(fade_ms), ..Default::default() };
 
-        // 新しい BGM 専用トラックを用意し、旧トラックをフェードアウトする。
-        // 同一トラックに即時 fade-out/fade-in を当てないことで、クロスフェードを成立させる。
-        let mut next_bgm_track = self
-            .manager
-            .add_sub_track(TrackBuilder::default())
-            .map_err(|e| anyhow!(e))?;
+        let mut next_bgm_track =
+            self.manager.add_sub_track(TrackBuilder::default()).map_err(|e| anyhow!(e))?;
         next_bgm_track.set_volume(Decibels::SILENCE, Tween::default());
 
         let mut previous_bgm_track = std::mem::replace(&mut self.bgm_track, next_bgm_track);
         previous_bgm_track.set_volume(Decibels::SILENCE, tween);
+        self.fading_out_bgm_tracks.push(FadingTrack {
+            _handle: previous_bgm_track,
+            fade_done_at: Instant::now() + Duration::from_millis(fade_ms),
+        });
 
         let handle = self.bgm_track.play(sound_data).map_err(|e| anyhow!(e))?;
         self.bgm_track.set_volume(Decibels::IDENTITY, tween);
 
         Ok(handle)
+    }
+
+    /// フェードアウト完了済みの旧 BGM トラックを解放する。
+    ///
+    /// フェード期間を経過したトラックを drop して kira リソースを回収する。
+    /// 毎フレーム呼ぶか、次回クロスフェード時に自動で呼ばれる。
+    pub fn purge_faded_tracks(&mut self) {
+        let now = Instant::now();
+        self.fading_out_bgm_tracks.retain(|t| t.fade_done_at > now);
     }
 
     /// BGM を一時停止する（雛形）。
