@@ -1,141 +1,141 @@
 ---
-description: アーキテクチャ規約（ECS × MVVM）
+description: Architecture conventions (ECS x MVVM)
 globs: **/*.rs
 alwaysApply: true
 ---
 
-# アーキテクチャ規約
+# Architecture Conventions
 
-## 全体方針
+## Overall Policy
 
-本エンジンは **ECS × MVVM** のハイブリッドアーキテクチャを採用する。ゲームロジック（ECS）と UI（MVVM）を直接参照せず、メッセージパッシング（イベントキュー）で疎結合に連携する。
+This engine adopts a hybrid **ECS x MVVM** architecture. Game logic (ECS) and UI (MVVM) are loosely coupled via message passing (event queues), without direct references.
 
 ## ECS (Entity Component System)
 
-### 基本ルール
+### Basic Rules
 
-- すべてのゲームオブジェクト（3Dモデル、Live2Dキャラ、スプライト、サウンドソース）は **Entity** として管理
-- **Component** はデータのみ保持し、ロジックを持たない
-- **System** はロジックのみ記述し、状態を保持しない
-- System 間の依存は明示的に宣言し、実行順序を制御
+- Manage all game objects (3D models, Live2D characters, sprites, sound sources) as **Entity**.
+- **Component** stores data only; no logic.
+- **System** contains logic only; no state.
+- Declare inter-system dependencies explicitly and control execution order.
 
-### Component 設計
+### Component Design
 
 ```rust
-// ✅ データのみのComponent
+// ✅ Data-only component
 pub struct Transform {
     pub position: Vec3,
     pub rotation: Quat,
     pub scale: Vec3,
 }
 
-// ❌ メソッドにロジックを持たせない
-// → System に記述する
+// ❌ Do not put logic in component methods
+// -> Put logic in systems
 ```
 
-### System 設計
+### System Design
 
-- System は単一責務を持つ（1 System = 1 関心事）
-- 副作用は Command パターンで遅延実行
-- クエリは必要最小限のコンポーネントに絞る
+- Each system has a single responsibility (1 system = 1 concern).
+- Defer side effects using the Command pattern.
+- Keep queries minimal, targeting only required components.
 
-## MVVM (UI アーキテクチャ)
+## MVVM (UI Architecture)
 
-### レイヤー構成
+### Layer Structure
 
-| レイヤー | 責務 | 技術 |
+| Layer | Responsibility | Technology |
 |----------|------|------|
-| **View** | UIノードの描画・レイアウト | Taffy (Flexbox), Filament 描画 |
-| **ViewModel** | UI状態保持、`Signal<T>` 管理 | Signal 駆動リアクティブ |
-| **Model** | ECS のゲームデータ | Component / Resource |
+| **View** | UI node rendering/layout | Taffy (Flexbox), Filament rendering |
+| **ViewModel** | UI state and `Signal<T>` management | Signal-driven reactive model |
+| **Model** | ECS game data | Component / Resource |
 
-### 通信フロー
+### Communication Flow
 
-#### UI → ECS (コマンドキュー)
-
-```text
-View → ViewModel → Command → mpsc::channel → ECS System
-```
-
-- ユーザー操作を ViewModel が `Command` enum に変換
-- チャネル経由で ECS の入力ハンドリング System に送信
-- 次フレームで ECS が安全に処理
-
-#### ECS → UI (Signal 更新)
+#### UI -> ECS (Command Queue)
 
 ```text
-ECS Component (変更検知) → ViewModel (Signal<T> 更新) → View (再描画)
+View -> ViewModel -> Command -> mpsc::channel -> ECS System
 ```
 
-- UI 同期 System が Component の変更を検知
-- 対応する ViewModel の `Signal<T>` を更新
-- 購読している View ノードだけが再描画
+- ViewModel translates user actions into a `Command` enum.
+- Send commands via channel to ECS input-handling systems.
+- ECS processes them safely in the next frame.
 
-### 禁止事項
+#### ECS -> UI (Signal Update)
 
-- ❌ View から ECS Component を直接読み書き
-- ❌ ECS System から View ノードを直接操作
-- ❌ ViewModel にゲームロジックを記述
+```text
+ECS component change detection -> ViewModel (Signal<T> update) -> View re-render
+```
 
-## Scene トレイト
+- UI sync systems detect component changes.
+- Update corresponding ViewModel `Signal<T>`.
+- Re-render only subscribed view nodes.
 
-すべてのゲームパート（ADVパート、ミニゲーム、タイトル画面等）は `Scene` トレイトを実装する。
+### Prohibited Patterns
+
+- ❌ Direct ECS component read/write from View
+- ❌ Direct View node manipulation from ECS systems
+- ❌ Putting game logic into ViewModel
+
+## Scene Trait
+
+All game parts (ADV section, minigames, title screen, etc.) implement the `Scene` trait.
 
 ```rust
 pub trait Scene: Send + Sync {
-    /// シーンの初期化（アセットロード完了後に呼ばれる）
+    /// Initialize scene (called after asset loading completes)
     fn on_enter(&mut self, ctx: &mut SceneContext);
 
-    /// 毎フレーム更新
+    /// Per-frame update
     fn update(&mut self, ctx: &mut SceneContext, dt: f32) -> SceneTransition;
 
-    /// 描画コマンドの発行
+    /// Issue rendering commands
     fn render(&self, ctx: &RenderContext);
 
-    /// シーン終了時のクリーンアップ
+    /// Cleanup when leaving the scene
     fn on_exit(&mut self, ctx: &mut SceneContext);
 
-    /// このシーンで必要なアセット一覧
+    /// Asset list required by this scene
     fn required_assets(&self) -> Vec<AssetDescriptor>;
 }
 ```
 
-### シーン遷移フロー
+### Scene Transition Flow
 
-1. 現シーン `on_exit()` → リソース解放
-2. アセット完全パージ（リーク防止）
-3. 新シーン `required_assets()` → 非同期ロード
-4. ロード完了後 `on_enter()` → 初期化
+1. Current scene `on_exit()` -> release resources
+2. Fully purge assets (prevent leaks)
+3. New scene `required_assets()` -> async load
+4. After load, `on_enter()` -> initialize
 
-## プラグインパターン（ミニゲーム）
+## Plugin Pattern (Minigames)
 
-- ミニゲームは独立した `Scene` トレイト実装として作成
-- ADV パートとの通信はメッセージパッシング（`MiniGameResult` enum）
-- ミニゲーム固有の ECS Component / System は専用モジュールにスコープ
-- ミニゲーム終了時に ECS をクリーンアップし、ADV パートに制御を返す
+- Build minigames as independent `Scene` trait implementations.
+- Communicate with ADV part via message passing (`MiniGameResult` enum).
+- Scope minigame-specific ECS components/systems in dedicated modules.
+- Cleanup ECS on minigame end and return control to ADV part.
 
-## Z-Order ルール
+## Z-Order Rules
 
-描画レイヤーの深度値を統一する。
+Use unified depth values for render layers.
 
-| レイヤー | Z 値 | 説明 |
+| Layer | Z value | Description |
 |----------|-------|------|
-| Background | `10.0` | 背景画像、HDR 環境マップ |
-| 3D/Live2D | `0.0` 〜 `5.0` | キャラクター・オブジェクト（描画順で制御） |
-| Characters | `-1.0` 〜 `-5.0` | 前景キャラクター |
-| UI/Text | `-10.0` | 最前面 UI（Orthoカメラ、深度テスト無効） |
+| Background | `10.0` | Background images, HDR environment map |
+| 3D/Live2D | `0.0` to `5.0` | Characters/objects (ordered by draw order) |
+| Characters | `-1.0` to `-5.0` | Foreground characters |
+| UI/Text | `-10.0` | Topmost UI (orthographic camera, depth test off) |
 
-## マルチビュー・レンダリング
+## Multi-View Rendering
 
-- **Game View (Layer 0)**: 3D空間。PBR + IBL + Live2D (Render-to-Texture) + 2D Sprite (Quad)
-- **UI View (Layer 1)**: Ortho カメラ。深度テスト無効。UI/テキスト描画専用
+- **Game View (Layer 0)**: 3D space with PBR + IBL + Live2D (render-to-texture) + 2D sprites (quad).
+- **UI View (Layer 1)**: Orthographic camera, depth test disabled, dedicated to UI/text rendering.
 
 ## Dual RNG
 
-| 用途 | アルゴリズム | 性質 |
+| Usage | Algorithm | Property |
 |------|-------------|------|
-| 演出 (VisualRng) | Xoshiro256++ | 非決定論的、高速 |
-| ロジック (LogicRng) | ChaCha8 | 決定論的、リプレイ再現可能 |
+| Visual effects (VisualRng) | Xoshiro256++ | Non-deterministic, fast |
+| Logic (LogicRng) | ChaCha8 | Deterministic, replayable |
 
-- シーン遷移時に LogicRng のシードを「バケツリレー」方式で引き継ぐ
-- セーブデータに LogicRng のシード状態を含める
+- Hand over LogicRng seeds across scene transitions in a chained manner.
+- Include LogicRng seed state in save data.

@@ -1,6 +1,6 @@
 ## 概要
 
-フェイズ1（ワークスペース初期化）の p1a として、ルートの `Cargo.toml` とワークスペースメンバー（engine_core, script_editor, game_player）を定義した。既存の develop には同内容が含まれているため、本 PR は履歴整理・計画との対応付け用です。
+フェーズ1（ワークスペース初期化）の p1a として、ルートの `Cargo.toml` とワークスペースメンバー（engine_core, script_editor, game_player）を定義した。既存の develop には同内容が含まれているため、本 PR は履歴整理・計画との対応付け用です。
 
 ## 変更内容
 
@@ -18,4 +18,3 @@ cargo check --workspace
 ## 関連 Issue
 
 <!-- 該当する Issue があれば Closes #<番号> -->
-

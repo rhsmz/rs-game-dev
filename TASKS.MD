@@ -48,9 +48,9 @@
 
 ### ECS API 残タスク
 
-- [ ] `StorageIter` / `StorageIterMut` 名前付きイテレータの導入（現在は `impl Iterator` で返却）
-- [ ] `EventWriter<T>` / `EventReader<T>` ハンドル型の導入（現在は `EventQueue<T>` を直接操作）
-- [ ] スタブモジュールの Clippy 警告修正（asset, audio, input, renderer, rng, save, scene, script, ffi, util — 計 85 件: `Default` 未実装、`#[must_use]` 不足、`const fn` 化 等）
+- [x] `StorageIter` / `StorageIterMut` 名前付きイテレータの導入（現在は `impl Iterator` で返却）
+- [x] `EventWriter<T>` / `EventReader<T>` ハンドル型の導入（現在は `EventQueue<T>` を直接操作）
+- [x] スタブモジュールの Clippy 警告修正（asset, audio, input, renderer, rng, save, scene, script, ffi, util — 計 85 件: `Default` 未実装、`#[must_use]` 不足、`const fn` 化 等）
 
 ---
 
@@ -58,29 +58,29 @@
 
 ### Renderer — Filament レンダラー統合 (plan/02)
 
-- [ ] Filament C API の FFI バインディング生成（`ffi/filament_sys.rs`）
-- [ ] `build.rs` でのライブラリリンク設定
-- [ ] `RenderEngine` ラッパー（Engine / Renderer / SwapChain の初期化・終了）
-- [ ] `GameView`（Perspective カメラ + PBR + IBL、Layer 0）
-- [ ] `UiView`（Ortho カメラ、深度テスト無効、Layer 1）
-- [ ] IBL / ライティング（HDR 環境マップ、DirectionalLight、SkyBox）
-- [ ] 2D スプライト描画（3D Quad + テクスチャ、Z-Order 制御）
-- [ ] Render-to-Texture（Live2D 合成用オフスクリーンターゲット）
-- [ ] ポストプロセス（Bloom、Tone Mapping、ガウシアンブラー）
-- [ ] ECS 連携（`MeshRenderer` / `Camera3D` Component、`render_system`）
-- [ ] ウィンドウ作成 + Filament 初期化テスト
-- [ ] マルチビュー描画テスト
+- [x] Filament C API の FFI バインディング生成（`ffi/filament_sys.rs`）
+- [x] `build.rs` でのライブラリリンク設定
+- [x] `RenderEngine` ラッパー（Engine / Renderer / SwapChain の初期化・終了）
+- [x] `GameView`（Perspective カメラ + PBR + IBL、Layer 0）
+- [x] `UiView`（Ortho カメラ、深度テスト無効、Layer 1）
+- [x] IBL / ライティング（HDR 環境マップ、DirectionalLight、SkyBox）
+- [x] 2D スプライト描画（3D Quad + テクスチャ、Z-Order 制御）
+- [x] Render-to-Texture（Live2D 合成用オフスクリーンターゲット）
+- [x] ポストプロセス（Bloom、Tone Mapping、ガウシアンブラー）
+- [x] ECS 連携（`MeshRenderer` / `Camera3D` Component、`render_system`）
+- [x] ウィンドウ作成 + Filament 初期化テスト
+- [x] マルチビュー描画テスト
 
 ### Audio — サウンドシステム (plan/03)
 
-- [ ] `kira` クレート依存追加
-- [ ] `GameAudioManager`（kira ラッパー、BGM / SE / Voice の 3 トラック構成）
-- [ ] BGM 制御（ロード、ループ再生、クロスフェード遷移、一時停止/再開）
-- [ ] SE 制御（重複再生対応、ワンショット再生、ボリューム/パン制御）
-- [ ] Voice 再生 + RMS 解析リップシンク（`calculate_lip_sync_value`）
-- [ ] CSV メタデータ連携（`sound.csv` から `SoundMeta` デシリアライズ）
-- [ ] ECS 連携（`AudioSource` Component、`AudioCommand` enum）
-- [ ] AudioManager 初期化 / BGM 再生 / RMS 数値テスト
+- [x] `kira` クレート依存追加
+- [x] `GameAudioManager`（kira ラッパー、BGM / SE / Voice の 3 トラック構成）
+- [x] BGM 制御（ロード、ループ再生、クロスフェード遷移、一時停止/再開）
+- [x] SE 制御（重複再生対応、ワンショット再生、ボリューム/パン制御）
+- [x] Voice 再生 + RMS 解析リップシンク（`calculate_lip_sync_value`）
+- [x] CSV メタデータ連携（`sound.csv` から `SoundMeta` デシリアライズ）
+- [x] ECS 連携（`AudioSource` Component、`AudioCommand` enum）
+- [x] AudioManager 初期化 / BGM 再生 / RMS 数値テスト
 
 ### Input — 入力抽象化 (plan/04)
 

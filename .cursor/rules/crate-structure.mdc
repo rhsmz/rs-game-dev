@@ -1,15 +1,15 @@
 ---
-description: クレート構造規約（依存方向・公開API）
+description: Crate structure rules (dependency direction and public API)
 globs: **/Cargo.toml
 alwaysApply: true
 ---
 
-# クレート構造規約
+# Crate Structure Rules
 
-## Workspace 構成
+## Workspace Layout
 
 ```toml
-# Cargo.toml (ルート)
+# Cargo.toml (root)
 [workspace]
 members = [
     "crates/engine_core",
@@ -19,7 +19,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-# 共通依存をワークスペースレベルで管理
+# Manage shared dependencies at workspace level
 serde = { version = "1", features = ["derive"] }
 rmp-serde = "1"
 anyhow = "1"
@@ -27,59 +27,59 @@ thiserror = "2"
 log = "0.4"
 ```
 
-## クレート概要
+## Crate Overview
 
-### `engine_core` — 心臓部 (Model)
+### `engine_core` - Core (Model)
 
-- **責務**: ゲームエンジンのコアロジック全般
-- **サブモジュール構成**:
-  - `ecs/` — Entity Component System 基盤
-  - `renderer/` — Filament ラッパー、マルチビューレンダリング
-  - `live2d/` — Live2D Cubism SDK FFI ラッパー
-  - `vrm/` — VRM/FBX ローダー、SpringBone
-  - `audio/` — kira/rodio ベースのサウンドシステム
-  - `asset/` — 非同期アセットローダー、キャッシュ
-  - `script/` — タグベーススクリプトパーサ、ステートマシン
-  - `scene/` — Scene トレイト、シーンマネージャー
-  - `input/` — 入力抽象化
-  - `save/` — セーブ/ロード（MessagePack）
-  - `rng/` — Dual RNG (Xoshiro256++ / ChaCha8)
-  - `ffi/` — C/C++ FFI 境界の隔離モジュール
+- **Responsibility**: Core game engine logic.
+- **Submodules**:
+  - `ecs/` - Entity Component System foundation
+  - `renderer/` - Filament wrappers and multi-view rendering
+  - `live2d/` - Live2D Cubism SDK FFI wrappers
+  - `vrm/` - VRM/FBX loader and SpringBone
+  - `audio/` - kira/rodio-based sound system
+  - `asset/` - Async asset loader and cache
+  - `script/` - Tag-based script parser and state machine
+  - `scene/` - Scene trait and scene manager
+  - `input/` - Input abstraction
+  - `save/` - Save/load (MessagePack)
+  - `rng/` - Dual RNG (Xoshiro256++ / ChaCha8)
+  - `ffi/` - Isolated C/C++ FFI boundary modules
 
-### `script_editor` — オーサリングツール
+### `script_editor` - Authoring Tool
 
-- **責務**: スクリプト編集、ライブプレビュー、ビジュアル編集
-- **依存**: `engine_core` に依存
-- **サブモジュール構成**:
-  - `ui/` — エディタ UI (MVVM + Signal)
-  - `preview/` — ライブプレビューエンジン
-  - `inspector/` — Live2D パラメータ、3D 配置の編集
-  - `project/` — プロジェクト管理、アセットブラウザ
+- **Responsibility**: Script editing, live preview, visual editing.
+- **Dependency**: Depends on `engine_core`.
+- **Submodules**:
+  - `ui/` - Editor UI (MVVM + Signal)
+  - `preview/` - Live preview engine
+  - `inspector/` - Live2D parameter and 3D placement editing
+  - `project/` - Project management and asset browser
 
-### `game_player` — 配布用ランタイム
+### `game_player` - Distribution Runtime
 
-- **責務**: デバッグ機能を省いた軽量実行環境
-- **依存**: `engine_core` に依存
-- **サブモジュール構成**:
-  - `archive/` — アセットアーカイブ解読
-  - `runtime/` — メインループ、設定ロード
+- **Responsibility**: Lightweight runtime without editor/debug features.
+- **Dependency**: Depends on `engine_core`.
+- **Submodules**:
+  - `archive/` - Asset archive handling
+  - `runtime/` - Main loop and configuration loading
 
-## 依存関係ルール
+## Dependency Rules
 
 ```text
 game_player ──→ engine_core
 script_editor ──→ engine_core
 ```
 
-- `engine_core` は他のクレートに依存しない（最下層）
-- `script_editor` と `game_player` は互いに依存しない
-- 循環依存は厳禁
+- `engine_core` must not depend on other internal crates (lowest layer).
+- `script_editor` and `game_player` must not depend on each other.
+- Circular dependencies are prohibited.
 
-## 公開 API 設計
+## Public API Design
 
-- 各クレートのルート (`lib.rs`) で公開モジュールを re-export
-- 内部実装は `pub(crate)` で隠蔽
-- Feature flag で機能のオプション化
+- Re-export public modules from each crate root (`lib.rs`).
+- Hide internal implementation with `pub(crate)`.
+- Gate optional functionality with feature flags.
 
 ```rust
 // engine_core/src/lib.rs
@@ -91,17 +91,17 @@ pub mod script;
 pub mod scene;
 pub mod save;
 
-// 内部のみ
+// internal only
 pub(crate) mod ffi;
 pub(crate) mod util;
 ```
 
-## 新クレート追加時
+## When Adding a New Crate
 
-1. `crates/<name>/` ディレクトリ作成
+1. Create `crates/<name>/` directory.
 2. `cargo init --lib crates/<name>`
-3. ルート `Cargo.toml` の `members` に追加
-4. 依存方向ルールに違反しないことを確認
-5. README にクレート説明を追記
+3. Add it to `members` in root `Cargo.toml`.
+4. Verify dependency-direction rules are not violated.
+5. Add crate description to README.
 
-詳細手順は `.agent/workflows/new_crate.md` を参照。
+See `.agent/workflows/new_crate.md` for detailed steps.

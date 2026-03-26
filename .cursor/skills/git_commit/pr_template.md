@@ -15,4 +15,3 @@ cargo test
 ## 関連 Issue
 
 <!-- Closes #<番号> -->
-

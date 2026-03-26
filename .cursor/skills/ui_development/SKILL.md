@@ -1,23 +1,23 @@
 ---
 name: ui_development
-description: MVVM + Signal 駆動 UI 開発スキル（Taffy レイアウト、SDF テキスト、Glassmorphism）
+description: MVVM + signal-driven UI development skill (Taffy layout, SDF text, Glassmorphism)
 ---
 
-# UI 開発スキル
-## 概要
-本エンジンの UI は MVVM アーキテクチャ + Signal 駆動リアクティブシステムで構築する。レイアウトエンジンに Taffy (Flexbox)、テキスト描画に SDF、マテリアルに Glassmorphism を採用する。
+# UI Development Skill
+## Overview
+UI in this engine is built with MVVM architecture and a signal-driven reactive system. It uses Taffy (Flexbox) for layout, SDF for text rendering, and Glassmorphism materials.
 
-## MVVM レイヤー
-| レイヤー | 責務 | 実装概要 |
+## MVVM Layers
+| Layer | Responsibility | Implementation |
 |----------|------|----------|
-| View | レイアウト計算・描画 | Taffy + Filament Ortho |
-| ViewModel | UI 状態管理 | `Signal<T>` リアクティブ |
-| Model | ECS ゲームデータ | Component / Resource |
+| View | Layout calculation and rendering | Taffy + Filament Ortho |
+| ViewModel | UI state management | `Signal<T>` reactive |
+| Model | ECS game data | Component / Resource |
 
-## Signal 駆動リアクティブシステム
-Floem の思想を継承。値の変更があった UI コンポーネントのみを再計算・再描画する。
+## Signal-Driven Reactive System
+Inspired by Floem. Recompute/re-render only UI components whose values changed.
 ```rust
-// Signal 定義
+// Signal definition
 pub struct Signal<T> {
     value: T,
     subscribers: Vec<Callback>,
@@ -31,7 +31,7 @@ impl<T: PartialEq> Signal<T> {
     pub fn set(&mut self, new_value: T) {
         if self.value != new_value {
             self.value = new_value;
-            // 購読者に変更通知
+            // Notify subscribers of the change
             for cb in &self.subscribers {
                 cb.notify();
             }
@@ -44,8 +44,8 @@ impl<T: PartialEq> Signal<T> {
 }
 ```
 
-## Taffy レイアウト
-Flexbox アルゴリズムでUIノードの座標・サイズを計算。
+## Taffy Layout
+Compute UI node coordinates and sizes using the Flexbox algorithm.
 ```rust
 use taffy::prelude::*;
 
@@ -76,12 +76,12 @@ pub fn build_message_box(taffy: &mut TaffyTree) -> NodeId {
 }
 ```
 
-## SDF テキスト描画
-Signed Distance Field 方式で劣化のないテキスト描画を実現。
-### フロー
-1. フォントからグリフの SDF テクスチャアトラスを事前生成
-2. Filament のカスタムマテリアルで SDF サンプリング
-3. 任意のスケールでシャープなテキスト描画
+## SDF Text Rendering
+Use signed distance fields for crisp text rendering without quality loss.
+### Flow
+1. Pre-generate an SDF texture atlas from font glyphs.
+2. Sample SDF in a custom Filament material.
+3. Render sharp text at arbitrary scales.
 ```rust
 pub struct SdfTextRenderer {
     atlas: SdfAtlas,
@@ -90,30 +90,30 @@ pub struct SdfTextRenderer {
 
 impl SdfTextRenderer {
     pub fn render_text(&self, text: &str, position: Vec2, font_size: f32, color: Color) {
-        // グリフごとに Quad を生成、SDF マテリアルで描画
+        // Create per-glyph quads and render with SDF material
     }
 }
 ```
 
-## Glassmorphism マテリアル
-背景ぼかし + 半透明 + 薄いボーダーの Glassmorphism エフェクト。
+## Glassmorphism Material
+Glassmorphism effect: blurred background + translucency + thin border.
 ```rust
 pub struct GlassMaterial {
-    pub blur_radius: f32,      // 背景ぼかし強度
-    pub opacity: f32,          // 不透明度 (0.0〜1.0)
-    pub border_radius: f32,    // 角丸半径
-    pub border_width: f32,     // ボーダー幅
-    pub tint_color: Color,     // 着色
+    pub blur_radius: f32,      // background blur strength
+    pub opacity: f32,          // opacity (0.0-1.0)
+    pub border_radius: f32,    // corner radius
+    pub border_width: f32,     // border width
+    pub tint_color: Color,     // tint color
 }
 ```
 
-### 実装方式
-1. Game View のレンダリング結果をテクスチャとしてキャプチャ
-2. ガウシアンブラーを適用した背景テクスチャを生成
-3. UI パネルの背景として使用
+### Implementation
+1. Capture Game View output as texture.
+2. Generate a Gaussian-blurred background texture.
+3. Use it as UI panel background.
 
-## 基本 UI コンポーネント
-### メッセージウィンドウ
+## Core UI Components
+### Message Window
 ```rust
 pub struct MessageWindow {
     pub text: Signal<String>,
@@ -124,7 +124,7 @@ pub struct MessageWindow {
 }
 ```
 
-### 選択肢パネル
+### Choice Panel
 ```rust
 pub struct ChoicePanel {
     pub choices: Signal<Vec<ChoiceItem>>,
@@ -133,7 +133,7 @@ pub struct ChoicePanel {
 }
 ```
 
-### ステータス表示
+### Status Bar
 ```rust
 pub struct StatusBar {
     pub hp: Signal<f32>,
@@ -142,8 +142,8 @@ pub struct StatusBar {
 }
 ```
 
-## ECS ↔ UI 通信
-### UI → ECS (コマンドキュー)
+## ECS <-> UI Communication
+### UI -> ECS (command queue)
 ```rust
 pub enum UiCommand {
     ChoiceSelected(usize),
@@ -152,15 +152,14 @@ pub enum UiCommand {
 }
 ```
 
-### ECS → UI (Signal 更新)
+### ECS -> UI (signal updates)
 ```rust
-// UI 同期 System
-pub fn ui_sync_system(/* ECS クエリ */) {
-    // Component 変更検知 → Signal 更新
-    // 例: HP 変更を検知 → status_bar.hp.set(new_hp)
+// UI sync system
+pub fn ui_sync_system(/* ECS query */) {
+    // Detect component changes -> update signals
+    // Example: detect HP change -> status_bar.hp.set(new_hp)
 }
 ```
 
-## 描画レイヤー
-UI は `UI View (Layer 1)` に描画。Ortho カメラ、深度テスト無効、Z = -10.0。
-
+## Render Layer
+Render UI in `UI View (Layer 1)` with orthographic camera, depth testing disabled, Z = -10.0.
