@@ -82,6 +82,8 @@ impl GameAudioManager {
 
     /// BGM をループ再生する（雛形）。
     ///
+    /// `loop_end` が `0.0` のときは曲末尾（`sound.csv` の慣習: 0 = end-of-file）までループする。
+    ///
     /// # Errors
     /// - `TrackHandle::play` が失敗した場合
     pub fn play_bgm_loop(
@@ -90,7 +92,14 @@ impl GameAudioManager {
         loop_start: f32,
         loop_end: f32,
     ) -> anyhow::Result<StaticSoundHandle> {
-        let looped = sound_data.loop_region(f64::from(loop_start)..f64::from(loop_end));
+        let start = f64::from(loop_start);
+        // loop_end == 0.0 は "曲末尾まで" を意味する（sound.csv の仕様）。
+        // 非ゼロ値のみ上限として設定し、ゼロは開区間（RangeFrom）に変換する。
+        let looped = if loop_end == 0.0 {
+            sound_data.loop_region(start..)
+        } else {
+            sound_data.loop_region(start..f64::from(loop_end))
+        };
         self.play_bgm(looped)
     }
 
@@ -121,9 +130,13 @@ impl GameAudioManager {
             fade_done_at: Instant::now() + Duration::from_millis(fade_ms),
         });
 
+        // sound_data に設定済みのターゲットボリュームを保持したままフェードインする。
+        // IDENTITY に決め打ちすると、音量が明示的に設定された BGM が
+        // フェード後に 0 dB（最大音量）で再生されてしまう問題を防ぐ。
+        let target_volume = sound_data.settings.volume;
         let mut handle =
             self.bgm_track.play(sound_data.volume(Decibels::SILENCE)).map_err(|e| anyhow!(e))?;
-        handle.set_volume(Decibels::IDENTITY, tween);
+        handle.set_volume(target_volume, tween);
 
         Ok(handle)
     }
@@ -210,6 +223,41 @@ mod tests {
         };
 
         let _handle = manager.play_bgm(sound_data)?;
+        Ok(())
+    }
+
+    #[test]
+    #[ignore] // 音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする
+    fn test_play_bgm_loop_zero_loop_end_plays_to_end() -> anyhow::Result<()> {
+        let mut manager = GameAudioManager::new()?;
+        let frames: std::sync::Arc<[Frame]> = (0..4410).map(|_| Frame::from_mono(0.0)).collect();
+        let sound_data = StaticSoundData {
+            sample_rate: 44_100,
+            frames,
+            settings: StaticSoundSettings::default(),
+            slice: None,
+        };
+        // loop_end=0.0 は "曲末尾まで" を意味する。
+        // エラーなく再生できることを確認する。
+        let _handle = manager.play_bgm_loop(&sound_data, 0.0, 0.0)?;
+        Ok(())
+    }
+
+    #[test]
+    #[ignore] // 音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする
+    fn test_crossfade_bgm_to_preserves_source_volume() -> anyhow::Result<()> {
+        use kira::Value;
+        let mut manager = GameAudioManager::new()?;
+        let frames: std::sync::Arc<[Frame]> = (0..32).map(|_| Frame::from_mono(0.0)).collect();
+        let sound_data = StaticSoundData {
+            sample_rate: 44_100,
+            frames: frames.clone(),
+            settings: StaticSoundSettings::default(),
+            slice: None,
+        };
+        // -6dB に設定した BGM をクロスフェードしても 0 dB にならないことを確認する。
+        let quiet_sound = sound_data.volume(Value::Fixed(Decibels::from(-6.0)));
+        let _handle = manager.crossfade_bgm_to(&quiet_sound, 500)?;
         Ok(())
     }
 }
