@@ -70,6 +70,9 @@ impl World {
 
     /// Entity に Component を追加する。
     pub fn insert_component<T: Component>(&mut self, entity: Entity, component: T) {
+        if !self.is_alive(entity) {
+            return;
+        }
         let storage = self.get_or_create_storage::<T>();
         storage.insert(entity, component);
     }
@@ -313,5 +316,15 @@ mod tests {
 
         let reader_after_clear = world.get_event_reader::<PlayerDeath>().unwrap();
         assert!(reader_after_clear.is_empty());
+    }
+
+    #[test]
+    fn test_insert_component_ignores_non_alive_entity() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.despawn(e);
+
+        world.insert_component(e, Position { x: 9.0, y: 9.0 });
+        assert!(world.get_component::<Position>(e).is_none());
     }
 }

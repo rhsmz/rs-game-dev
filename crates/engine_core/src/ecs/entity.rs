@@ -94,7 +94,9 @@ impl EntityAllocator {
     #[must_use]
     pub fn is_alive(&self, entity: Entity) -> bool {
         let idx = entity.index as usize;
-        idx < self.generations.len() && self.generations[idx] == entity.generation
+        idx < self.generations.len()
+            && self.alive.get(idx).copied().unwrap_or(false)
+            && self.generations[idx] == entity.generation
     }
 
     /// 現在生存している Entity の数を返す。
