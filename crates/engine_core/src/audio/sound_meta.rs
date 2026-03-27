@@ -49,6 +49,8 @@ pub fn deserialize_sound_meta_from_csv_reader<R: std::io::Read>(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::float_cmp)]
+
     use super::*;
 
     #[test]

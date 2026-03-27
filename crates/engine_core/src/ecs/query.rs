@@ -350,6 +350,8 @@ impl WorldQueryExt for World {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::float_cmp, clippy::ignored_unit_patterns)]
+
     use super::*;
 
     #[derive(Debug, PartialEq, Clone)]

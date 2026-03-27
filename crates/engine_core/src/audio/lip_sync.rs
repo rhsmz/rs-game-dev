@@ -28,6 +28,8 @@ pub fn calculate_lip_sync_value(audio_samples: &[f32], frame_size: usize) -> f32
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::float_cmp)]
+
     use super::*;
 
     #[test]
