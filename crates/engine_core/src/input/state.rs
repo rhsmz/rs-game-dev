@@ -109,9 +109,13 @@ impl InputState {
     }
 
     /// ゲームパッドボタン解放を反映する。
+    ///
+    /// 当該ゲームパッドが未登録（一度も押下イベントが無い）の場合は何もしない。
+    /// 未知の `GamepadId` からの解放イベントだけで空の [`GamepadState`] を作らない。
     pub fn set_gamepad_button_up(&mut self, gamepad: GamepadId, button: GamepadButton) {
-        let state = self.gamepads.entry(gamepad).or_default();
-        Self::apply_up(&mut state.pressed, button);
+        if let Some(state) = self.gamepads.get_mut(&gamepad) {
+            Self::apply_up(&mut state.pressed, button);
+        }
     }
 
     /// マウス座標を更新し、差分を計算する。
@@ -140,6 +144,8 @@ impl InputState {
         for state in self.gamepads.values_mut() {
             Self::promote_map(&mut state.pressed);
         }
+        // 全ボタンが未押下になったゲームパッドはエントリごと削除（空の蓄積を防ぐ）
+        self.gamepads.retain(|_, state| !state.pressed.is_empty());
     }
 
     fn promote_map<T: Copy + Eq + std::hash::Hash>(map: &mut HashMap<T, ButtonPhase>) {
@@ -301,5 +307,31 @@ mod tests {
         let id = GamepadId(0);
         state.set_gamepad_button_up(id, GamepadButton::South);
         assert!(!state.is_gamepad_just_released(id, GamepadButton::South));
+        assert!(
+            !state.gamepads.contains_key(&id),
+            "未押下の up では gamepads にエントリを作らない"
+        );
+    }
+
+    #[test]
+    fn test_input_state_gamepad_up_unknown_ids_do_not_accumulate() {
+        let mut state = InputState::new();
+        for i in 0..64 {
+            state.set_gamepad_button_up(GamepadId(i), GamepadButton::South);
+        }
+        assert!(state.gamepads.is_empty(), "未知の GamepadId への up のみでは gamepads が増えない");
+    }
+
+    #[test]
+    fn test_input_state_gamepad_cleared_after_release_tick() {
+        let mut state = InputState::new();
+        let id = GamepadId(0);
+        state.set_gamepad_button_down(id, GamepadButton::South);
+        state.set_gamepad_button_up(id, GamepadButton::South);
+        state.tick();
+        assert!(
+            !state.gamepads.contains_key(&id),
+            "解放後の tick で空のゲームパッドエントリは削除される"
+        );
     }
 }
