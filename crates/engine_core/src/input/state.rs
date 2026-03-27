@@ -89,7 +89,7 @@ impl InputState {
 
     /// キー解放を反映する。
     pub fn set_key_up(&mut self, key: KeyCode) {
-        self.keyboard.insert(key, ButtonPhase::JustReleased);
+        Self::apply_up(&mut self.keyboard, key);
     }
 
     /// マウスボタン押下を反映する。
@@ -99,7 +99,7 @@ impl InputState {
 
     /// マウスボタン解放を反映する。
     pub fn set_mouse_button_up(&mut self, button: MouseButton) {
-        self.mouse_buttons.insert(button, ButtonPhase::JustReleased);
+        Self::apply_up(&mut self.mouse_buttons, button);
     }
 
     /// ゲームパッドボタン押下を反映する。
@@ -111,7 +111,7 @@ impl InputState {
     /// ゲームパッドボタン解放を反映する。
     pub fn set_gamepad_button_up(&mut self, gamepad: GamepadId, button: GamepadButton) {
         let state = self.gamepads.entry(gamepad).or_default();
-        state.pressed.insert(button, ButtonPhase::JustReleased);
+        Self::apply_up(&mut state.pressed, button);
     }
 
     /// マウス座標を更新し、差分を計算する。
@@ -171,6 +171,16 @@ impl InputState {
                 if matches!(entry.get(), ButtonPhase::JustReleased) {
                     entry.insert(ButtonPhase::JustPressed);
                 }
+            }
+        }
+    }
+
+    fn apply_up<T: Copy + Eq + std::hash::Hash>(map: &mut HashMap<T, ButtonPhase>, key: T) {
+        use std::collections::hash_map::Entry;
+
+        if let Entry::Occupied(mut entry) = map.entry(key) {
+            if !matches!(entry.get(), ButtonPhase::JustReleased) {
+                entry.insert(ButtonPhase::JustReleased);
             }
         }
     }
@@ -268,6 +278,28 @@ mod tests {
 
         state.tick();
         assert!(state.is_gamepad_pressed(id, GamepadButton::South));
+        assert!(!state.is_gamepad_just_released(id, GamepadButton::South));
+    }
+
+    #[test]
+    fn test_input_state_key_up_without_press_is_ignored() {
+        let mut state = InputState::new();
+        state.set_key_up(KeyCode::Enter);
+        assert!(!state.is_just_released(KeyCode::Enter));
+    }
+
+    #[test]
+    fn test_input_state_mouse_up_without_press_is_ignored() {
+        let mut state = InputState::new();
+        state.set_mouse_button_up(MouseButton::Left);
+        assert!(!state.is_mouse_just_released(MouseButton::Left));
+    }
+
+    #[test]
+    fn test_input_state_gamepad_up_without_press_is_ignored() {
+        let mut state = InputState::new();
+        let id = GamepadId(0);
+        state.set_gamepad_button_up(id, GamepadButton::South);
         assert!(!state.is_gamepad_just_released(id, GamepadButton::South));
     }
 }
