@@ -196,6 +196,8 @@ impl Default for World {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     struct Position {

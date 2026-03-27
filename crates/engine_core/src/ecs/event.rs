@@ -209,6 +209,8 @@ impl Default for EventQueues {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]
@@ -229,8 +231,7 @@ mod tests {
         queue.send("hello");
         queue.send("world");
 
-        let items: Vec<_> = queue.iter().collect();
-        assert_eq!(items.len(), 2);
+        assert_eq!(queue.iter().count(), 2);
         assert_eq!(queue.len(), 2); // まだ消費されていない
     }
 

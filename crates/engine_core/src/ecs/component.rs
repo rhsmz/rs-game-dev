@@ -264,6 +264,8 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::float_cmp)]
+
     use super::*;
 
     #[derive(Debug, PartialEq)]
@@ -323,8 +325,7 @@ mod tests {
         storage.insert(entity(0, 0), Position { x: 1.0, y: 1.0 });
         storage.insert(entity(1, 0), Position { x: 2.0, y: 2.0 });
 
-        let items: Vec<_> = storage.iter().collect();
-        assert_eq!(items.len(), 2);
+        assert_eq!(storage.iter().count(), 2);
     }
 
     #[test]
