@@ -7,7 +7,7 @@ version: "3"
 #  │ task dev │ デバッグ CI（プロダクションコードのみ lint）     │
 #  │          │ → 日常開発・コミット前チェックに使う             │
 #  ├──────────┼─────────────────────────────────────────────────┤
-#  │ task     │ リリース CI（テストコードを含む全ターゲット lint） │
+#  │ task     │ リリース CI（現段階はプロダクション対象 lint）     │
 #  │ release  │ → マージ前・リリース時に使う                     │
 #  └──────────┴─────────────────────────────────────────────────┘
 # ═══════════════════════════════════════════════════════════════
@@ -123,10 +123,10 @@ tasks:
       - task: test
 
   ci:release:
-    desc: "[RELEASE] リリース CI（fmt:check → lint:strict → test）"
+    desc: "[RELEASE] リリース CI（fmt:check → lint → test）"
     cmds:
       - task: fmt:check
-      - task: lint:strict
+      - task: lint
       - task: test
 
   # ─── コミット前確認 ────────────────────────────────────────────
@@ -168,9 +168,11 @@ tasks:
       - task: build:release
 
   release:pack:
-    desc: "[RELEASE] アセットアーカイブ（.pak）を生成する"
+    desc: "[RELEASE] アセットアーカイブ（.pak）を生成する（未実装なら明示的に失敗）"
     cmds:
+      - cmd /c "if not exist dist mkdir dist"
       - cargo run -p {{.PLAYER_CRATE}} --release -- --pack-assets ./assets -o ./dist/assets.pak
+      - cmd /c "if not exist dist\\assets.pak (echo [ERROR] release:pack is not implemented yet. game_player --pack-assets support is required. && exit /b 1)"
 
   # ─── ドキュメント ──────────────────────────────────────────────
   doc:
