@@ -84,7 +84,7 @@ impl InputState {
 
     /// キー押下を反映する。
     pub fn set_key_down(&mut self, key: KeyCode) {
-        self.keyboard.entry(key).or_insert(ButtonPhase::JustPressed);
+        Self::apply_down(&mut self.keyboard, key);
     }
 
     /// キー解放を反映する。
@@ -94,7 +94,7 @@ impl InputState {
 
     /// マウスボタン押下を反映する。
     pub fn set_mouse_button_down(&mut self, button: MouseButton) {
-        self.mouse_buttons.entry(button).or_insert(ButtonPhase::JustPressed);
+        Self::apply_down(&mut self.mouse_buttons, button);
     }
 
     /// マウスボタン解放を反映する。
@@ -105,7 +105,7 @@ impl InputState {
     /// ゲームパッドボタン押下を反映する。
     pub fn set_gamepad_button_down(&mut self, gamepad: GamepadId, button: GamepadButton) {
         let state = self.gamepads.entry(gamepad).or_default();
-        state.pressed.entry(button).or_insert(ButtonPhase::JustPressed);
+        Self::apply_down(&mut state.pressed, button);
     }
 
     /// ゲームパッドボタン解放を反映する。
@@ -159,6 +159,45 @@ impl InputState {
             map.remove(&key);
         }
     }
+
+    fn apply_down<T: Copy + Eq + std::hash::Hash>(map: &mut HashMap<T, ButtonPhase>, key: T) {
+        use std::collections::hash_map::Entry;
+
+        match map.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(ButtonPhase::JustPressed);
+            }
+            Entry::Occupied(mut entry) => {
+                if matches!(entry.get(), ButtonPhase::JustReleased) {
+                    entry.insert(ButtonPhase::JustPressed);
+                }
+            }
+        }
+    }
+
+    /// ゲームパッドボタンが押下中かどうか。
+    #[must_use]
+    pub fn is_gamepad_pressed(&self, gamepad: GamepadId, button: GamepadButton) -> bool {
+        self.gamepads.get(&gamepad).is_some_and(|state| state.pressed.contains_key(&button))
+    }
+
+    /// このフレームでゲームパッドボタンが押されたか。
+    #[must_use]
+    pub fn is_gamepad_just_pressed(&self, gamepad: GamepadId, button: GamepadButton) -> bool {
+        self.gamepads
+            .get(&gamepad)
+            .and_then(|state| state.pressed.get(&button))
+            .is_some_and(|phase| matches!(phase, ButtonPhase::JustPressed))
+    }
+
+    /// このフレームでゲームパッドボタンが離されたか。
+    #[must_use]
+    pub fn is_gamepad_just_released(&self, gamepad: GamepadId, button: GamepadButton) -> bool {
+        self.gamepads
+            .get(&gamepad)
+            .and_then(|state| state.pressed.get(&button))
+            .is_some_and(|phase| matches!(phase, ButtonPhase::JustReleased))
+    }
 }
 
 #[cfg(test)]
@@ -192,5 +231,43 @@ mod tests {
         assert_eq!(state.mouse_delta(), [10.0, 20.0]);
         state.tick();
         assert_eq!(state.mouse_delta(), [0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_input_state_key_repress_in_same_frame_remains_pressed() {
+        let mut state = InputState::new();
+        state.set_key_down(KeyCode::Enter);
+        state.set_key_up(KeyCode::Enter);
+        state.set_key_down(KeyCode::Enter);
+        assert!(state.is_just_pressed(KeyCode::Enter));
+
+        state.tick();
+        assert!(state.is_pressed(KeyCode::Enter));
+    }
+
+    #[test]
+    fn test_input_state_mouse_repress_in_same_frame_remains_pressed() {
+        let mut state = InputState::new();
+        state.set_mouse_button_down(MouseButton::Left);
+        state.set_mouse_button_up(MouseButton::Left);
+        state.set_mouse_button_down(MouseButton::Left);
+        assert!(state.is_mouse_just_pressed(MouseButton::Left));
+
+        state.tick();
+        assert!(state.is_mouse_pressed(MouseButton::Left));
+    }
+
+    #[test]
+    fn test_input_state_gamepad_repress_in_same_frame_remains_pressed() {
+        let mut state = InputState::new();
+        let id = GamepadId(0);
+        state.set_gamepad_button_down(id, GamepadButton::South);
+        state.set_gamepad_button_up(id, GamepadButton::South);
+        state.set_gamepad_button_down(id, GamepadButton::South);
+        assert!(state.is_gamepad_just_pressed(id, GamepadButton::South));
+
+        state.tick();
+        assert!(state.is_gamepad_pressed(id, GamepadButton::South));
+        assert!(!state.is_gamepad_just_released(id, GamepadButton::South));
     }
 }

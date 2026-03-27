@@ -50,7 +50,7 @@ impl ActionMap {
         match input {
             PhysicalInput::Key(key) => state.is_just_pressed(key),
             PhysicalInput::MouseButton(button) => state.is_mouse_just_pressed(button),
-            PhysicalInput::GamepadButton(_id, _button) => false,
+            PhysicalInput::GamepadButton(id, button) => state.is_gamepad_just_pressed(id, button),
         }
     }
 }
@@ -84,5 +84,19 @@ mod tests {
         state.set_mouse_button_down(MouseButton::Left);
         let actions = map.resolve(&state);
         assert_eq!(actions, vec!["click"]);
+    }
+
+    #[test]
+    fn test_action_map_resolve_gamepad_button_just_pressed() {
+        let mut map = ActionMap::new();
+        map.bind("jump", PhysicalInput::GamepadButton(GamepadId(1), GamepadButton::South));
+
+        let mut state = InputState::new();
+        state.set_gamepad_button_down(GamepadId(1), GamepadButton::South);
+        let actions = map.resolve(&state);
+        assert_eq!(actions, vec!["jump"]);
+
+        state.tick();
+        assert!(map.resolve(&state).is_empty());
     }
 }
