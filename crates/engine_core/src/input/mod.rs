@@ -1,19 +1,40 @@
 //! 入力抽象化モジュール。
 //!
-//! キーボード、マウス、ゲームパッドの統一入力管理。
-//! アクションマッピングによる抽象入力を提供する。
+//! キーボード、マウス、ゲームパッドの統一入力管理と
+//! アクションマッピングを提供する。
 
-pub struct InputManager;
+mod action;
+mod event;
+mod state;
+mod winit_bridge;
 
-impl Default for InputManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub use action::{ActionMap, PhysicalInput};
+pub use event::{ActionName, GamepadButton, GamepadId, InputEvent, KeyCode, MouseButton};
+pub use state::{GamepadState, InputState};
+pub use winit_bridge::convert_winit_event;
 
-impl InputManager {
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used)]
+
+    use super::*;
+    use crate::ecs::World;
+
+    #[test]
+    fn test_input_event_can_be_sent_to_ecs_event_queue() {
+        let mut world = World::new();
+        world.register_event::<InputEvent>();
+
+        {
+            let mut writer = world
+                .get_event_writer::<InputEvent>()
+                .expect("InputEvent queue should be registered");
+            writer.send(InputEvent::ActionTriggered { name: "confirm" });
+        }
+
+        let mut reader =
+            world.get_event_reader::<InputEvent>().expect("InputEvent queue should be registered");
+        let events: Vec<_> = reader.drain().collect();
+        assert_eq!(events, vec![InputEvent::ActionTriggered { name: "confirm" }]);
     }
 }

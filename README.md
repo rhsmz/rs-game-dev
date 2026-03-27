@@ -6,6 +6,19 @@
 
 ---
 
+## 1.1 開発・CI環境の前提（システム依存ライブラリ）
+
+本リポジトリでは、Rustクレート依存に加えて OS 側のライブラリが必要です。  
+特に `engine_core` は音声バックエンドとして `kira`（`alsa-sys` 経由）を利用するため、Linux では ALSA の開発パッケージが必要です。
+
+- Linux（Debian/Ubuntu系）: `libasound2-dev`（`alsa.pc` を提供）
+- Linux（Fedora/RHEL系）: `alsa-lib-devel`
+- Linux（Arch系）: `alsa-lib`
+
+`cargo test` / `cargo clippy` 実行時に `alsa.pc not found` が出る場合は、上記パッケージを先に導入してください。
+
+---
+
 ## 2. システムアーキテクチャ (Crate Structure)
 
 Rustのワークスペース機能を活用し、以下の3つの主要コンポーネントで構成する。全体のデータ・ロジック管理には **ECS (Entity Component System)** を採用し、高いパフォーマンスと拡張性を確保する。

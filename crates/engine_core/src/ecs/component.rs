@@ -115,8 +115,14 @@ impl<T: Component> ComponentStorage<T> {
         }
 
         if let Some(dense_idx) = self.sparse[idx] {
-            // 既存値を上書き
-            self.dense[dense_idx] = component;
+            if self.dense_to_entity[dense_idx] == entity {
+                // 同一 generation の既存値を上書き
+                self.dense[dense_idx] = component;
+            } else {
+                // 同一 index の世代差し替え（stale handle を無効化）
+                self.dense[dense_idx] = component;
+                self.dense_to_entity[dense_idx] = entity;
+            }
             self.changed[dense_idx] = true;
         } else {
             // 新規挿入
@@ -132,7 +138,8 @@ impl<T: Component> ComponentStorage<T> {
     #[must_use]
     pub fn get(&self, entity: Entity) -> Option<&T> {
         let idx = entity.index() as usize;
-        self.sparse.get(idx).and_then(|opt| opt.map(|dense_idx| &self.dense[dense_idx]))
+        let dense_idx = self.sparse.get(idx).copied().flatten()?;
+        if self.dense_to_entity[dense_idx] == entity { Some(&self.dense[dense_idx]) } else { None }
     }
 
     /// Entity の Component を可変参照で取得する。
@@ -141,7 +148,11 @@ impl<T: Component> ComponentStorage<T> {
     #[must_use]
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
         let idx = entity.index() as usize;
-        self.sparse.get(idx).copied().flatten().map(|dense_idx| {
+        let dense_idx = self.sparse.get(idx).copied().flatten()?;
+        if self.dense_to_entity[dense_idx] != entity {
+            return None;
+        }
+        Some({
             self.changed[dense_idx] = true;
             &mut self.dense[dense_idx]
         })
@@ -151,6 +162,9 @@ impl<T: Component> ComponentStorage<T> {
     pub fn remove_component(&mut self, entity: Entity) -> Option<T> {
         let idx = entity.index() as usize;
         if let Some(dense_idx) = self.sparse.get(idx).copied().flatten() {
+            if self.dense_to_entity[dense_idx] != entity {
+                return None;
+            }
             // swap-remove で O(1) 削除
             self.sparse[idx] = None;
             let last_dense = self.dense.len() - 1;
@@ -246,7 +260,10 @@ impl<T: Component> AnyComponentStorage for ComponentStorage<T> {
 
     fn contains(&self, entity: Entity) -> bool {
         let idx = entity.index() as usize;
-        self.sparse.get(idx).and_then(|opt| *opt).is_some()
+        self.sparse
+            .get(idx)
+            .and_then(|opt| *opt)
+            .is_some_and(|dense_idx| self.dense_to_entity[dense_idx] == entity)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -397,5 +414,23 @@ mod tests {
         let items: Vec<_> = storage.iter_changed().collect();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].0, e1);
+    }
+
+    #[test]
+    fn test_stale_generation_handle_cannot_access_reused_slot() {
+        let mut storage = ComponentStorage::<Position>::new();
+        let stale = entity(0, 0);
+        let current = entity(0, 1);
+
+        storage.insert(stale, Position { x: 1.0, y: 1.0 });
+        storage.insert(current, Position { x: 2.0, y: 2.0 });
+
+        assert!(storage.get(stale).is_none());
+        assert!(storage.get_mut(stale).is_none());
+        assert!(storage.remove_component(stale).is_none());
+        assert!(!storage.contains(stale));
+
+        let pos = storage.get(current).unwrap();
+        assert!((pos.x - 2.0).abs() < f32::EPSILON);
     }
 }

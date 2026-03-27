@@ -82,15 +82,15 @@
 - [x] ECS 連携（`AudioSource` Component、`AudioCommand` enum）
 - [x] AudioManager 初期化 / BGM 再生 / RMS 数値テスト
 
-### Input — 入力抽象化 (plan/04)
+### Input — 入力抽象化 (plan/04) ✅
 
-- [ ] `InputState`（キーボード / マウス / ゲームパッドの状態管理）
-- [ ] `is_pressed` / `is_just_pressed` / `is_just_released` フレーム判定
-- [ ] `ActionMap`（物理入力 → アクション名マッピング）
-- [ ] `InputEvent` enum（KeyPressed / MouseMoved / ActionTriggered）
-- [ ] ECS イベントキューへの入力送信
-- [ ] `winit` ウィンドウイベントからの変換
-- [ ] アクションマッピング解決テスト / フレーム間リセットテスト
+- [x] `InputState`（キーボード / マウス / ゲームパッドの状態管理）
+- [x] `is_pressed` / `is_just_pressed` / `is_just_released` フレーム判定
+- [x] `ActionMap`（物理入力 → アクション名マッピング）
+- [x] `InputEvent` enum（KeyPressed / MouseMoved / ActionTriggered）
+- [x] ECS イベントキューへの入力送信
+- [x] `winit` ウィンドウイベントからの変換
+- [x] アクションマッピング解決テスト / フレーム間リセットテスト
 
 ### Dual RNG — 乱数エンジン (plan/05)
 
