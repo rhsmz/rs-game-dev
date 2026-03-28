@@ -11,6 +11,7 @@ rmp-serde = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+env_logger = { workspace = true }
 raw-window-handle = "0.6.2"
 winit = "0.30.13"
 kira = "0.12.0"
