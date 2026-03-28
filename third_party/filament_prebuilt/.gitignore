@@ -1,0 +1,7 @@
+# リリースアーカイブ展開物（`scripts/fetch_filament_prebuilt.*` で生成）
+/windows-x86_64/*
+!/windows-x86_64/.gitkeep
+/linux-x86_64/*
+!/linux-x86_64/.gitkeep
+/macos-arm64/*
+!/macos-arm64/.gitkeep
