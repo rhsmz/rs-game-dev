@@ -1,6 +1,13 @@
 # https://taskfile.dev
 version: "3"
 
+includes:
+  submodules:
+    taskfile: ./third_party/Taskfile.yml
+    dir: .
+
+# サブモジュール運用: task submodules:init / submodules:status など（定義は third_party/Taskfile.yml）
+
 # ═══════════════════════════════════════════════════════════════
 #  ビルドモードの使い分け
 #  ┌──────────┬─────────────────────────────────────────────────┐

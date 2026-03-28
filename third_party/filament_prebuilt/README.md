@@ -1,5 +1,7 @@
 # Filament プリビルト（公式リリース）
 
+メンテナンス用チェックリストは親リポジトリの [`../FILAMENT_SUBMODULE_TASKS.md`](../FILAMENT_SUBMODULE_TASKS.md) を参照してください。
+
 [google/filament](https://github.com/google/filament) の **GitHub Releases** から取得したバイナリ／静的ライブラリを、OS 別ディレクトリに展開して使います。  
 中身は Git に含めません（容量が大きいため）。`VERSION` のタグに対応するアーカイブをスクリプトがダウンロードします。
 

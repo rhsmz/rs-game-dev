@@ -1,0 +1,71 @@
+# https://taskfile.dev
+# サブモジュール（third_party/*）の共通運用タスク。
+# ルート Taskfile から includes され、作業ディレクトリはリポジトリルート（dir: .）になる。
+#
+# 単体実行例: task -t third_party/Taskfile.yml --dir . <task>
+#
+# 新しいサブモジュール向けの取得・ビルド手順を追加するときは、
+# 汎用 Git タスク（init / sync / status …）に加え、
+# 「<name>:<action>」形式のタスクをこのファイルへ追記し、README に記載する。
+version: "3"
+
+vars:
+  SCRIPTS_DIR: scripts
+
+tasks:
+  default:
+    desc: "サブモジュール関連タスク一覧を表示する"
+    cmds:
+      - task --list
+
+  # ─── 全サブモジュール共通（Git） ───────────────────────────────
+  init:
+    desc: "未初期化のサブモジュールを取得しチェックアウトする（git submodule update --init --recursive）"
+    cmds:
+      - git submodule update --init --recursive
+
+  sync:
+    desc: ".gitmodules の URL をローカル設定に反映してから初期化する（sync → update）"
+    cmds:
+      - git submodule sync --recursive
+      - git submodule update --init --recursive
+
+  status:
+    desc: "各サブモジュールのコミット乖離を表示する（git submodule status）"
+    cmds:
+      - git submodule status
+
+  update:
+    desc: "superproject が記録しているコミットに各サブモジュールを揃える"
+    cmds:
+      - git submodule update --init --recursive
+
+  foreach-fetch:
+    desc: "各サブモジュールで git fetch --tags --prune を実行する（上流確認用）"
+    cmds:
+      - git submodule foreach --recursive "git fetch --tags --prune"
+
+  # ─── Filament（third_party/filament + filament_prebuilt）───────
+  filament:prebuilt:win:
+    desc: "Filament 公式プリビルトを展開する（Windows / PowerShell）"
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File {{.SCRIPTS_DIR}}/fetch_filament_prebuilt.ps1
+
+  filament:prebuilt:unix:
+    desc: "Filament 公式プリビルトを展開する（Linux / macOS / Git Bash）"
+    platforms: [linux, darwin]
+    cmds:
+      - bash {{.SCRIPTS_DIR}}/fetch_filament_prebuilt.sh
+
+  filament:push-mirror:
+    desc: "プライベートミラー rhsmz/filament-rs-game-dev へ現在のコミットを push（初回・時間がかかることがある）"
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File {{.SCRIPTS_DIR}}/push_filament_private_mirror.ps1
+
+  filament:push-mirror:unix:
+    desc: "プライベートミラーへ push（Linux / macOS）"
+    platforms: [linux, darwin]
+    cmds:
+      - bash {{.SCRIPTS_DIR}}/push_filament_private_mirror.sh

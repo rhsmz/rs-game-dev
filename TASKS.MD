@@ -1,7 +1,7 @@
 # タスクリスト — rs-game-dev
 
 > **最終更新**: 2026-03-28
-> **ビルド状態**: `cargo test --workspace` 全パス（engine_core は 68 passed / 3 ignored）/ `cargo fmt` OK / `cargo clippy --workspace --all-targets` 警告 0 件
+> **ビルド状態**: `cargo test --workspace` 全パス（engine_core は 71 passed / 3 ignored 相当）/ `cargo fmt` OK / `cargo clippy --workspace --all-targets` 警告 0 件
 > **現在ブランチ**: （作業ブランチに依存）
 
 ## Phase 0: プロジェクト基盤 ✅
@@ -70,6 +70,8 @@
 - [x] ECS 連携（`MeshRenderer` / `Camera3D` Component、`render_system`）
 - [x] ウィンドウ作成 + Filament 初期化テスト
 - [x] マルチビュー描画テスト
+
+**Filament サブモジュール / プリビルトの運用タスク**（バージョン整合・FFI・上流追従）は [`third_party/FILAMENT_SUBMODULE_TASKS.md`](third_party/FILAMENT_SUBMODULE_TASKS.md) を参照。
 
 ### Audio — サウンドシステム (plan/03)
 
