@@ -3,8 +3,6 @@
 //! Filament 側では「3D 空間内の Quad に 2D テクスチャを貼る」想定。
 //! 現時点ではデータ構造と API 面のみを先に用意する。
 
-use anyhow::anyhow;
-
 use crate::renderer::RenderEngine;
 
 /// 背景レイヤーの Z（背景は常に最背面扱い）。
@@ -49,13 +47,16 @@ impl SpriteRenderer {
         self.sprites.push(sprite);
     }
 
-    /// 現在投入されているスプライトを描画する（雛形）。
+    /// 現在投入されているスプライトを描画する（足場段階）。
+    ///
+    /// Filament への Quad 投入は未実装。投入済みスプライトはクリアされ、エラーにはしない。
     #[allow(clippy::missing_errors_doc)]
-    pub fn render(&mut self, _engine: &mut RenderEngine) -> anyhow::Result<()> {
-        // TODO: Filament の Quad 描画（3D 空間）へ実装する。
-        let _count = self.sprites.len();
+    pub fn render(&mut self, engine: &mut RenderEngine) -> anyhow::Result<()> {
+        let _ = engine;
+        let count = self.sprites.len();
         self.sprites.clear();
-        Err(anyhow!("SpriteRenderer.render is not implemented yet"))
+        log::trace!("SpriteRenderer.render (scaffold): cleared {count} sprites");
+        Ok(())
     }
 }
 

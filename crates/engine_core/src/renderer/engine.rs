@@ -57,6 +57,7 @@ impl RenderEngine {
                 anyhow!("Filament SwapChain_create returned null")
             })?;
 
+            log::trace!("RenderEngine: Engine, Renderer, SwapChain initialized");
             Ok(Self { engine, renderer, swap_chain })
         }
 
@@ -67,22 +68,71 @@ impl RenderEngine {
         }
     }
 
-    /// フレーム開始。現時点では雛形のため常に `false` を返す。
+    /// フレーム開始。`SwapChain` / `Renderer` に委譲する。
+    ///
+    /// `false` のときは描画をスキップし、呼び出し側は `render_system` を呼ばないこと。
     #[must_use]
-    #[allow(clippy::missing_const_for_fn)]
     pub fn begin_frame(&mut self) -> bool {
-        false
+        #[cfg(feature = "filament")]
+        {
+            // SAFETY: `swap_chain` / `renderer` は `NonNull` かつ `RenderEngine` 寿命内。
+            let ok = unsafe {
+                filament_sys::Renderer_beginFrame(self.swap_chain.as_ptr(), self.renderer.as_ptr())
+            };
+            if !ok {
+                log::warn!("RenderEngine::begin_frame returned false; skip rendering this frame");
+            }
+            ok
+        }
+        #[cfg(not(feature = "filament"))]
+        {
+            false
+        }
     }
 
-    /// フレーム終了（雛形）。
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn end_frame(&mut self) {}
+    /// フレーム終了。提出 / プレゼントに相当する処理を行う。
+    pub fn end_frame(&mut self) {
+        #[cfg(feature = "filament")]
+        {
+            // SAFETY: `renderer` は `NonNull` かつ `RenderEngine` 寿命内。
+            unsafe {
+                filament_sys::Renderer_endFrame(self.renderer.as_ptr());
+            }
+        }
+    }
 
-    /// リサイズ（雛形）。
-    #[allow(clippy::missing_const_for_fn)]
-    #[allow(clippy::unused_self)]
+    /// スワップチェーンおよびビューポートのリサイズ。
     pub fn resize(&mut self, width: u32, height: u32) {
-        let _ = (width, height);
+        #[cfg(feature = "filament")]
+        {
+            // SAFETY: `swap_chain` は `NonNull` かつ `RenderEngine` 寿命内。
+            unsafe {
+                filament_sys::SwapChain_resize(self.swap_chain.as_ptr(), width, height);
+            }
+            log::trace!("RenderEngine::resize {width}x{height}");
+        }
+        #[cfg(not(feature = "filament"))]
+        {
+            let _ = (width, height);
+        }
+    }
+
+    /// 単一 `View` を描画する（[`Self::begin_frame`] 成功後、[`Self::end_frame`] 前に呼ぶ）。
+    #[cfg(feature = "filament")]
+    pub(crate) fn render_filament_view(&mut self, view: Option<NonNull<filament_sys::View>>) {
+        let Some(view) = view else {
+            return;
+        };
+        // SAFETY: `renderer` / `view` は有効な Filament ハンドル。
+        unsafe {
+            filament_sys::Renderer_render(self.renderer.as_ptr(), view.as_ptr());
+        }
+    }
+
+    /// 内部の Filament `Engine` ポインタ（`View` / `Scene` 生成用）。
+    #[cfg(feature = "filament")]
+    pub(crate) const fn filament_engine(&self) -> NonNull<filament_sys::Engine> {
+        self.engine
     }
 }
 

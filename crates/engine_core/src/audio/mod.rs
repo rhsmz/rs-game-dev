@@ -5,9 +5,6 @@
 //!
 //! バックエンド: `kira` or `rodio`
 
-mod manager;
-pub use manager::GameAudioManager;
-
 mod lip_sync;
 pub use lip_sync::calculate_lip_sync_value;
 
@@ -18,6 +15,15 @@ pub use sound_meta::{
 
 mod ecs_integration;
 pub use ecs_integration::{AudioCommand, AudioSource, AudioTrack};
+
+mod command_queue;
+pub use command_queue::AudioCommandQueue;
+
+mod command_dispatch;
+pub use command_dispatch::audio_command_system;
+
+mod manager;
+pub use manager::GameAudioManager;
 
 /// 互換のための別名（段階的移行用）。
 pub type AudioManager = GameAudioManager;
