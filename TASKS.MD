@@ -71,7 +71,7 @@
 - [x] ウィンドウ作成 + Filament 初期化テスト
 - [x] マルチビュー描画テスト
 
-**Filament サブモジュール / プリビルトの運用タスク**（バージョン整合・FFI・上流追従）は [`third_party/FILAMENT_SUBMODULE_TASKS.md`](third_party/FILAMENT_SUBMODULE_TASKS.md) を参照。
+**Filament サブモジュール / プリビルトの運用タスク**（バージョン整合・FFI・上流追従）は、ルートの `third_party` が **[rhsmz/rs-game-dev-third-party](https://github.com/rhsmz/rs-game-dev-third-party)** のサブモジュールになっているため、初回は `git submodule update --init --recursive` で取得したうえで [`third_party/FILAMENT_SUBMODULE_TASKS.md`](third_party/FILAMENT_SUBMODULE_TASKS.md) を参照する。
 
 ### Audio — サウンドシステム (plan/03)
 
