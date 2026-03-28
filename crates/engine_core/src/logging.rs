@@ -106,30 +106,33 @@ fn open_log_file(dir: &Path, app_name: &str) -> io::Result<(PathBuf, File)> {
 /// # Errors
 ///
 /// グローバルロガーが既に登録されている場合など、[`env_logger::Builder::try_init`] が失敗すると返る。
+///
+/// パニックフックの上書きは、ロガー登録が**成功した場合にのみ**行う（失敗時はグローバル状態を変えない）。
 pub fn try_init_app_logging(app_name: &str) -> Result<Option<PathBuf>, LoggingInitError> {
-    install_panic_hook();
-
     let mut builder = new_logger_builder();
 
-    if log_file_disabled() {
+    let log_path = if log_file_disabled() {
         builder.try_init()?;
-        return Ok(None);
-    }
+        None
+    } else {
+        let dir = log_directory();
+        match open_log_file(&dir, app_name) {
+            Ok((path, file)) => {
+                let tee = TeeWriter { file: Some(file) };
+                builder.target(Target::Pipe(Box::new(tee)));
+                builder.try_init()?;
+                Some(path)
+            }
+            Err(e) => {
+                eprintln!("rs-game-dev: could not open log file ({e}); logging to stderr only");
+                builder.try_init()?;
+                None
+            }
+        }
+    };
 
-    let dir = log_directory();
-    match open_log_file(&dir, app_name) {
-        Ok((path, file)) => {
-            let tee = TeeWriter { file: Some(file) };
-            builder.target(Target::Pipe(Box::new(tee)));
-            builder.try_init()?;
-            Ok(Some(path))
-        }
-        Err(e) => {
-            eprintln!("rs-game-dev: could not open log file ({e}); logging to stderr only");
-            builder.try_init()?;
-            Ok(None)
-        }
-    }
+    install_panic_hook();
+    Ok(log_path)
 }
 
 #[cfg(test)]
