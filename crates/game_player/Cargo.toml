@@ -9,7 +9,6 @@ rust-version.workspace = true
 engine_core = { path = "../engine_core" }
 anyhow = { workspace = true }
 log = { workspace = true }
-env_logger = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,8 +1,8 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-27
-> **ビルド状態**: `cargo test --workspace` 46 テスト全パス（3 ignored）/ `cargo fmt` OK / `cargo clippy` 警告 0 件
-> **現在ブランチ**: develop (HEAD: 95afc7c)
+> **最終更新**: 2026-03-28
+> **ビルド状態**: `cargo test --workspace` 全パス（engine_core は 68 passed / 3 ignored）/ `cargo fmt` OK / `cargo clippy --workspace --all-targets` 警告 0 件
+> **現在ブランチ**: （作業ブランチに依存）
 
 ## Phase 0: プロジェクト基盤 ✅
 
@@ -92,14 +92,14 @@
 - [x] `winit` ウィンドウイベントからの変換
 - [x] アクションマッピング解決テスト / フレーム間リセットテスト
 
-### Dual RNG — 乱数エンジン (plan/05)
+### Dual RNG — 乱数エンジン (plan/05) ✅
 
-- [ ] `rand` / `rand_xoshiro` / `rand_chacha` 依存追加
-- [ ] `VisualRng`（Xoshiro256++、演出用、非決定的シード）
-- [ ] `LogicRng`（ChaCha8、ロジック用、決定論的シード）
-- [ ] `derive_child_seed` によるシーン遷移時のシード・バケツリレー
-- [ ] ECS リソースとして登録（`world.insert_resource`）
-- [ ] 同一シード再現性テスト / 統計的一様分布テスト
+- [x] `rand` / `rand_xoshiro` / `rand_chacha` 依存追加（`[workspace.dependencies]` 集約）
+- [x] `VisualRng`（Xoshiro256++、演出用、スレッド RNG 由来の非決定論的起動シード）
+- [x] `LogicRng`（ChaCha8、ロジック用、決定論的シード）
+- [x] `derive_child_seed` によるシーン遷移時のシード・バケツリレー（親シード + `salt` で子 `LogicSeed` を導出）
+- [x] ECS リソースとして登録（`world.insert_resource` で `LogicRng` / `VisualRng`）
+- [x] 同一シード再現性テスト / 粗い一様分布（ビン頻度）テスト / `World` 登録テスト
 
 ---
 
