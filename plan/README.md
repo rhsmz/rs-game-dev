@@ -60,6 +60,7 @@ graph TD
 | **4** | [12](./12_save_system.md) | Save System | 01 | M |
 | **5** | [13](./13_script_editor.md) | Script Editor | 07, 11 | XL |
 | **5** | [14](./14_game_player.md) | Game Player | 08, 12 | M |
+| **X** | [15](./15_phase2_readiness_plan.md) | Phase 2 Readiness Plan | 02, 03, 04, 05 | M |
 
 > **規模目安**: S=1-3日, M=3-7日, L=1-2週, XL=2-4週
 
@@ -70,3 +71,8 @@ graph TD
 - Phase 3 の Live2D/VRM は Renderer 完成後に開始
 - Phase 4 の UI/Save は **並行開発可能**
 - Phase 5 は全コア機能完成後に着手
+
+
+## 補助プラン
+
+- [15](./15_phase2_readiness_plan.md): Phase 2 着手前の改善項目を WBS 化した実行計画（英語版）。
