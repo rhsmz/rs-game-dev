@@ -19,6 +19,9 @@ anyhow = "1"
 thiserror = "2"
 log = "0.4"
 env_logger = "0.11"
+rand = { version = "0.8", features = ["std", "std_rng", "getrandom"] }
+rand_chacha = "0.3"
+rand_xoshiro = "0.6"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
