@@ -20,6 +20,13 @@ pub struct RenderEngine {
     #[cfg(feature = "filament")]
     swap_chain: NonNull<filament_sys::SwapChain>,
 
+    /// 直近の `resize` に基づくスワップチェーン相当の描画解像度（`View` の投影・ビューポート同期用）。
+    #[cfg(feature = "filament")]
+    framebuffer_width: u32,
+
+    #[cfg(feature = "filament")]
+    framebuffer_height: u32,
+
     // 現時点の雛形では、非 Filament 環境でもコンパイルできるようにダミー領域を持つ。
     #[cfg(not(feature = "filament"))]
     _private: (),
@@ -61,7 +68,7 @@ impl RenderEngine {
                 target: "engine_core::renderer",
                 "RenderEngine: Filament Engine, Renderer, SwapChain initialized (resize + viewport to be applied per frame)"
             );
-            Ok(Self { engine, renderer, swap_chain })
+            Ok(Self { engine, renderer, swap_chain, framebuffer_width: 4, framebuffer_height: 4 })
         }
 
         #[cfg(not(feature = "filament"))]
@@ -111,6 +118,8 @@ impl RenderEngine {
     pub fn resize(&mut self, width: u32, height: u32) {
         #[cfg(feature = "filament")]
         {
+            self.framebuffer_width = width.max(1);
+            self.framebuffer_height = height.max(1);
             // SAFETY: `swap_chain` は `NonNull` かつ `RenderEngine` 寿命内。
             unsafe {
                 filament_sys::SwapChain_resize(self.swap_chain.as_ptr(), width, height);
@@ -139,6 +148,13 @@ impl RenderEngine {
     #[cfg(feature = "filament")]
     pub(crate) const fn filament_engine(&self) -> NonNull<filament_sys::Engine> {
         self.engine
+    }
+
+    /// `ViewCamera_update_*` へ渡すフレームバッファサイズ（少なくとも 1x1）。
+    #[cfg(feature = "filament")]
+    #[must_use]
+    pub(crate) const fn framebuffer_dimensions(&self) -> (u32, u32) {
+        (self.framebuffer_width, self.framebuffer_height)
     }
 }
 

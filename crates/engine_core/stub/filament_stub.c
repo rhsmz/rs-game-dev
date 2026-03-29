@@ -13,6 +13,7 @@ typedef struct Scene Scene;
 typedef struct View View;
 typedef struct Renderer Renderer;
 typedef struct SwapChain SwapChain;
+typedef struct ViewCameraBinding ViewCameraBinding;
 
 Engine *Engine_create(void) {
     return (Engine *)calloc(1u, sizeof(void *));
@@ -86,4 +87,57 @@ void SwapChain_resize(SwapChain *swap_chain, unsigned int width, unsigned int he
 void Renderer_render(Renderer *renderer, View *view) {
     (void)renderer;
     (void)view;
+}
+
+void *ViewCamera_create_game(Engine *engine, View *view, unsigned int width, unsigned int height,
+                             float fov_y_radians, float near_plane, float far_plane) {
+    (void)engine;
+    (void)view;
+    (void)width;
+    (void)height;
+    (void)fov_y_radians;
+    (void)near_plane;
+    (void)far_plane;
+    return calloc(1u, sizeof(void *));
+}
+
+void *ViewCamera_create_ui(Engine *engine, View *view, unsigned int width, unsigned int height,
+                           float near_plane, float far_plane) {
+    (void)engine;
+    (void)view;
+    (void)width;
+    (void)height;
+    (void)near_plane;
+    (void)far_plane;
+    return calloc(1u, sizeof(void *));
+}
+
+void ViewCamera_update_game(Engine *engine, View *view, void *binding, unsigned int width,
+                            unsigned int height, float fov_y_radians, float near_plane,
+                            float far_plane) {
+    (void)engine;
+    (void)view;
+    (void)binding;
+    (void)width;
+    (void)height;
+    (void)fov_y_radians;
+    (void)near_plane;
+    (void)far_plane;
+}
+
+void ViewCamera_update_ui(Engine *engine, View *view, void *binding, unsigned int width,
+                          unsigned int height, float near_plane, float far_plane) {
+    (void)engine;
+    (void)view;
+    (void)binding;
+    (void)width;
+    (void)height;
+    (void)near_plane;
+    (void)far_plane;
+}
+
+void ViewCamera_destroy(Engine *engine, View *view, void *binding_void) {
+    (void)engine;
+    (void)view;
+    free(binding_void);
 }

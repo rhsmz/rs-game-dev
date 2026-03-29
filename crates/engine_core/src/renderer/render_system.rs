@@ -6,6 +6,8 @@ use crate::renderer::{GameView, RenderEngine, UiView};
 #[cfg(feature = "filament")]
 use crate::ecs::component::ComponentStorage;
 #[cfg(feature = "filament")]
+use crate::renderer::render_trace;
+#[cfg(feature = "filament")]
 use crate::renderer::{Camera3D, MeshRenderer};
 
 /// レンダリング処理。
@@ -20,9 +22,17 @@ use crate::renderer::{Camera3D, MeshRenderer};
 /// # カメラ欠如時
 /// カメラが 1 体も無い場合はメッシュ系の投入をスキップし、ビューのみ描画する（フェイルファストしない）。
 #[allow(clippy::missing_const_for_fn)]
-pub fn render_system(world: &World, engine: &mut RenderEngine, game: &GameView, ui: &UiView) {
+pub fn render_system(
+    world: &World,
+    engine: &mut RenderEngine,
+    game: &mut GameView,
+    ui: &mut UiView,
+) {
     #[cfg(feature = "filament")]
     {
+        game.sync_framebuffer_from_engine(engine);
+        ui.sync_framebuffer_from_engine(engine);
+
         let cam_count = world.get_storage::<Camera3D>().map_or(0, ComponentStorage::len);
         let mesh_count = world.get_storage::<MeshRenderer>().map_or(0, ComponentStorage::len);
 
@@ -44,7 +54,9 @@ pub fn render_system(world: &World, engine: &mut RenderEngine, game: &GameView, 
         }
 
         // P0-1: Game View を先に、UI View を後に描画（アーキテクチャの Z オーダー方針に一致）。
+        render_trace::record_render_pass("game_view");
         engine.render_filament_view(Some(game.filament_view_ptr()));
+        render_trace::record_render_pass("ui_view");
         engine.render_filament_view(Some(ui.filament_view_ptr()));
     }
 

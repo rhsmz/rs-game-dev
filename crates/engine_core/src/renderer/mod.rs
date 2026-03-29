@@ -26,3 +26,8 @@ pub use components::MeshRenderer;
 
 mod render_system;
 pub use render_system::render_system;
+
+#[cfg(feature = "filament")]
+mod render_trace;
+#[cfg(feature = "filament")]
+pub use render_trace::{reset_render_pass_trace, take_render_pass_trace};

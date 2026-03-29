@@ -52,6 +52,12 @@ pub struct SwapChain {
     _private: [u8; 0],
 }
 
+/// `Entity` + `Camera` を束ねるブリッジ内部ハンドル（不透明）。
+#[repr(C)]
+pub struct ViewCameraBinding {
+    _private: [u8; 0],
+}
+
 unsafe extern "C" {
     /// `filament::Engine::create()` に相当。
     pub(crate) fn Engine_create() -> *mut Engine;
@@ -97,4 +103,53 @@ unsafe extern "C" {
 
     /// `renderer->render(view)` に相当。
     pub(crate) fn Renderer_render(renderer: *mut Renderer, view: *mut View);
+
+    /// Game View 用透視カメラを生成し `View` に関連付ける。
+    pub(crate) fn ViewCamera_create_game(
+        engine: *mut Engine,
+        view: *mut View,
+        width: u32,
+        height: u32,
+        fov_y_radians: f32,
+        near_plane: f32,
+        far_plane: f32,
+    ) -> *mut ViewCameraBinding;
+
+    /// UI View 用オルソカメラを生成し、`TRANSLUCENT` / ポストプロセスオフ等を設定する。
+    pub(crate) fn ViewCamera_create_ui(
+        engine: *mut Engine,
+        view: *mut View,
+        width: u32,
+        height: u32,
+        near_plane: f32,
+        far_plane: f32,
+    ) -> *mut ViewCameraBinding;
+
+    pub(crate) fn ViewCamera_update_game(
+        engine: *mut Engine,
+        view: *mut View,
+        binding: *mut ViewCameraBinding,
+        width: u32,
+        height: u32,
+        fov_y_radians: f32,
+        near_plane: f32,
+        far_plane: f32,
+    );
+
+    pub(crate) fn ViewCamera_update_ui(
+        engine: *mut Engine,
+        view: *mut View,
+        binding: *mut ViewCameraBinding,
+        width: u32,
+        height: u32,
+        near_plane: f32,
+        far_plane: f32,
+    );
+
+    /// `View` からカメラを切り離し、`Camera` コンポーネントと Entity を破棄する。
+    pub(crate) fn ViewCamera_destroy(
+        engine: *mut Engine,
+        view: *mut View,
+        binding: *mut ViewCameraBinding,
+    );
 }

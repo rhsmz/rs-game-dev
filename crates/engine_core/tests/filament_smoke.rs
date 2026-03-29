@@ -9,11 +9,13 @@
 //! ## Phase 2 readiness（P0-1）との対応
 //! - 1 フレーム: `begin_frame` → `render_system`（GameView → UiView の順）→ `end_frame`
 //! - スワップチェーンリサイズ: ウィンドウの `inner_size` を `RenderEngine::resize` に渡す
+//! - `ENGINE_CORE_RENDER_TRACE=1` 時は描画パス順（game_view → ui_view）をバッファに記録し、テストで検証する
 //! - ECS: `Camera3D` + `MeshRenderer` を投入し、メッシュ幾何の Filament バインドは Phase 2 以降（現状はビュー描画とログで縦切りを検証）
 
 use engine_core::ecs::world::World;
 use engine_core::renderer::{
-    Camera3D, GameView, MeshRenderer, RenderEngine, UiView, render_system,
+    Camera3D, GameView, MeshRenderer, RenderEngine, UiView, render_system, reset_render_pass_trace,
+    take_render_pass_trace,
 };
 use raw_window_handle::HasWindowHandle;
 use winit::application::ApplicationHandler;
@@ -36,8 +38,8 @@ impl ApplicationHandler for FilamentOneFrameApp {
 
             let mut engine = RenderEngine::new(handle)?;
             engine.resize(size.width, size.height);
-            let game_view = GameView::new(&engine)?;
-            let ui_view = UiView::new(&engine)?;
+            let mut game_view = GameView::new(&engine)?;
+            let mut ui_view = UiView::new(&engine)?;
 
             let mut world = World::new();
             let cam = world.spawn();
@@ -49,7 +51,7 @@ impl ApplicationHandler for FilamentOneFrameApp {
             world.insert_component(mesh, MeshRenderer { renderable_id: 1 });
 
             assert!(engine.begin_frame(), "begin_frame must succeed (dev stub or real Filament)");
-            render_system(&world, &mut engine, &game_view, &ui_view);
+            render_system(&world, &mut engine, &mut game_view, &mut ui_view);
             engine.end_frame();
 
             self.window = Some(window);
@@ -78,8 +80,28 @@ fn build_event_loop() -> anyhow::Result<EventLoop<()>> {
 
 #[test]
 fn test_filament_one_frame_vertical_slice() -> anyhow::Result<()> {
+    reset_render_pass_trace();
+    // SAFETY: テストは単一スレッドで、他コードと `ENGINE_CORE_RENDER_TRACE` を共有しない。
+    unsafe {
+        std::env::set_var("ENGINE_CORE_RENDER_TRACE", "1");
+    }
     let event_loop = build_event_loop()?;
     let mut app = FilamentOneFrameApp { window: None, test_result: Ok(()) };
     event_loop.run_app(&mut app)?;
-    app.test_result
+    let trace = take_render_pass_trace();
+    unsafe {
+        std::env::remove_var("ENGINE_CORE_RENDER_TRACE");
+    }
+    app.test_result?;
+    assert_eq!(
+        trace,
+        vec!["game_view".to_string(), "ui_view".to_string()],
+        "GameView を先に、UiView を後に `Renderer_render` する（P0-1 描画順保証）"
+    );
+    Ok(())
 }
+
+/// 3D と UI が同一スワップチェーンに重なる際のピクセル一致検証は、ゴールデン画像ハーネス導入後に有効化する。
+#[test]
+#[ignore = "visual regression: golden image harness not wired yet (Game/UI overlap)"]
+fn test_game_ui_overlap_visual_regression_placeholder() {}
