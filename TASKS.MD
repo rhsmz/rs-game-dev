@@ -18,6 +18,22 @@
 
 関連計画: [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md)
 
+### `#[ignore]` 付きテストの運用
+
+- **タスク完了の唯一の根拠にしない**（デバイス依存・ゴールデン画像未導入など）。必ず上表の **縦スライス** 行でデバイス非依存テストを埋める。
+- 本番要件は **別行**（nightly / 手動）で明示し、PR の「検証証跡」欄にコマンドを残す。
+
+### Phase 1 readiness — 検証コマンド早見表（`engine_core`）
+
+| 領域 | コマンド |
+|------|----------|
+| ワークスペース既定 | `cargo test --workspace` |
+| スタブ音声（kira 非リンク） | `cargo test -p engine_core --no-default-features` |
+| 音声キュー FIFO（デバイス非依存） | `cargo test -p engine_core --test audio_command_drain` |
+| 音声ユニット（FIFO・drop 等） | `cargo test -p engine_core audio::command_dispatch` |
+| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨） |
+| 音声デバイス依存（ignored） | `cargo test -p engine_core --features audio-kira -- --ignored`（nightly ワークフロー可） |
+
 ## Phase 0: プロジェクト基盤 ✅
 
 ### ワークスペース初期化 (plan/00) ✅

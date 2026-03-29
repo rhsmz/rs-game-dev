@@ -175,6 +175,21 @@ Turn the current pre-Phase-2 findings into an executable plan that closes critic
 
 ---
 
+## 検証コマンド（エビデンス用）
+
+| 領域 | コマンド |
+|------|----------|
+| ワークスペース | `cargo test --workspace` |
+| `engine_core` スタブ音声 | `cargo test -p engine_core --no-default-features` |
+| Audio キュー（統合・デバイス非依存） | `cargo test -p engine_core --test audio_command_drain` |
+| Audio dispatch（FIFO・bulk drop 等） | `cargo test -p engine_core audio::command_dispatch::tests` |
+| Renderer smoke | `cargo test -p engine_core --features filament --test filament_smoke` |
+| Audio 実デバイス（ignored） | `cargo test -p engine_core --features audio-kira -- --ignored` |
+
+`#[ignore]` のみをもってタスク完了にしないこと（`TASKS.MD` の運用ルール参照）。
+
+---
+
 ## 実施状況ログ（2026-03-29 更新）
 
 ### P0-1 Renderer 縦切り
@@ -189,8 +204,11 @@ Turn the current pre-Phase-2 findings into an executable plan that closes critic
 - [x] Phase 2 まで未配線であることをドキュメント化、`dead_code` 許可は足場専用とコメント
 
 ### P0-3 Audio ECS
-- [x] `audio_command_system` + キュー FIFO（既存）
-- [x] **E2E テスト** `test_audio_ecs_set_volume_end_to_end`（`#[ignore]` — 音声バックエンド依存、ローカルは `cargo test -p engine_core test_audio_ecs_set_volume_end_to_end -- --ignored` で実行）
+- [x] `audio_command_system` + キュー FIFO、**同一フレーム優先ルールは厳密 FIFO**（`command_dispatch` モジュール doc）
+- [x] 競合境界テスト: `test_fifo_stop_play_stop_play_policy` / `test_fifo_play_se_set_volume_play_voice` / bulk drop しきい値
+- [x] warn ログキー: `seq` / `source` / `op` / `err_kind`（`target = engine_core::audio`）
+- [x] **デバイス非依存**: `audio_command_drain` + `command_dispatch` ユニット
+- [x] **E2E（kira）** `test_audio_ecs_set_volume_end_to_end_kira`（`#[ignore]` — nightly / 手動のみ完了根拠にしない）
 
 ### P1-1 CI
 - [x] `.github/workflows/ci.yml`: `fmt` / `clippy` / `test --workspace`、行列で `ubuntu` + `--no-default-features`、`windows`

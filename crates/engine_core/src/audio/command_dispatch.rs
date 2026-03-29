@@ -1,4 +1,21 @@
 //! `AudioCommand` を `GameAudioManager` へ適用する。
+//!
+//! # 同一フレーム内の優先ルール（競合コマンド）
+//!
+//! **追加順＝適用順（厳密 FIFO）**。キューに `StopBgm` を先に積み、その後に `PlayBgm` を積めば、
+//! ドレイン時は **必ず Stop → Play** の順でマネージャに渡る。逆順を積めば逆の結果になる。
+//! 「Stop を Play より常に優先」などの暗黙の再並べ替えは行わない。
+//!
+//! # 観測用ログ（warn / trace）
+//!
+//! `target = "engine_core::audio"` を統一する。異常系 warn 行には次のキーを含める（grep・監視向け）:
+//! - `seq=` … [`QueuedAudioCommand::seq`]
+//! - `source=` … 発行元 `Entity` の表示、または `-`
+//! - `op=` … `PlayBgm` / `PlaySe` / `PlayVoice` / `StopBgm` / `SetVolume` など
+//! - `err_kind=` … `skip_missing_file` / `io` / `decode` / `backend`
+//!
+//! ログ本文の完全一致をユニットテストで固定しない（プロセス全体で 1 ロガー制約のため）。
+//! 手動確認は `RUST_LOG=engine_core::audio=trace` 等を参照。
 
 #[cfg(feature = "audio-kira")]
 use std::path::Path;
@@ -12,6 +29,9 @@ use super::ecs_integration::AudioCommand;
 #[cfg(feature = "audio-kira")]
 use super::error::AudioLoadError;
 use super::manager::GameAudioManager;
+
+/// `GameAudioManager` 不在時に一度に捨てるコマンド数がこの値以上なら、追加で warn を出す（運用監視用）。
+const AUDIO_QUEUE_DROP_BULK_WARN_THRESHOLD: usize = 16;
 
 fn format_source_entity(source: Option<Entity>) -> String {
     source.map_or_else(|| "-".to_string(), |e| e.to_string())
@@ -77,6 +97,11 @@ fn apply_audio_command(
             Ok(())
         }
         AudioCommand::StopBgm { fade_ms } => {
+            log::trace!(
+                target: "engine_core::audio",
+                "seq={seq} source={} op=StopBgm fade_ms={fade_ms}",
+                format_source_entity(source),
+            );
             manager.pause_bgm(fade_ms);
             Ok(())
         }
@@ -114,7 +139,7 @@ fn apply_audio_command(
             if lip_sync {
                 log::trace!(
                     target: "engine_core::audio",
-                    "seq={seq} source={} PlayVoice lip_sync requested for {voice_id:?} (not wired yet)",
+                    "seq={seq} source={} op=PlayVoice lip_sync=requested voice_id={voice_id:?} (not wired yet)",
                     format_source_entity(source),
                 );
             }
@@ -150,7 +175,7 @@ fn apply_audio_command(
         AudioCommand::SetVolume { track, volume } => {
             log::trace!(
                 target: "engine_core::audio",
-                "seq={seq} source={} SetVolume track={track:?} volume={volume}",
+                "seq={seq} source={} op=SetVolume track={track:?} volume={volume}",
                 format_source_entity(source),
             );
             manager.set_track_volume_linear(track, volume, 0);
@@ -255,6 +280,12 @@ pub fn audio_command_system(world: &mut World) {
                 target: "engine_core::audio",
                 "audio_command_system: dropping {dropped} audio command(s): GameAudioManager resource missing (first_seq={first_seq:?})",
             );
+            if dropped >= AUDIO_QUEUE_DROP_BULK_WARN_THRESHOLD {
+                log::warn!(
+                    target: "engine_core::audio",
+                    "audio_command_system: bulk_drop threshold exceeded (drop_count={dropped} threshold={AUDIO_QUEUE_DROP_BULK_WARN_THRESHOLD})",
+                );
+            }
             queue.pending.clear();
         }
         world.insert_resource(queue);
@@ -315,6 +346,61 @@ mod tests {
 
         let q_after = world.get_resource::<AudioCommandQueue>().expect("queue reinserted");
         assert!(q_after.is_empty());
+    }
+
+    /// マネージャ不在時に大量ドロップしてもキューが空になり、bulk 閾値ロジックがパニックしない。
+    #[test]
+    fn test_audio_command_system_drops_bulk_without_manager() {
+        let mut world = World::new();
+        let mut q = AudioCommandQueue::default();
+        for i in 0_u64..20 {
+            q.push(AudioCommand::StopBgm { fade_ms: i });
+        }
+        world.insert_resource(q);
+
+        audio_command_system(&mut world);
+
+        let q_after = world.get_resource::<AudioCommandQueue>().expect("queue reinserted");
+        assert!(q_after.is_empty());
+    }
+
+    /// `StopBgm` → `PlayBgm` → `StopBgm` → `PlayBgm` を積んだ順で drain する（暗黙の並べ替えなし）。
+    #[test]
+    fn test_fifo_stop_play_stop_play_policy() {
+        let mut q = AudioCommandQueue::default();
+        q.push(AudioCommand::StopBgm { fade_ms: 1 });
+        q.push(AudioCommand::PlayBgm("a".into()));
+        q.push(AudioCommand::StopBgm { fade_ms: 2 });
+        q.push(AudioCommand::PlayBgm("b".into()));
+
+        let mut sink = RecordingAudioSink::default();
+        dispatch_audio_commands_to_sink(&mut q, &mut sink);
+
+        assert_eq!(sink.log.len(), 4);
+        assert!(matches!(sink.log[0].command, AudioCommand::StopBgm { fade_ms: 1 }));
+        assert!(matches!(sink.log[1].command, AudioCommand::PlayBgm(_)));
+        assert!(matches!(sink.log[2].command, AudioCommand::StopBgm { fade_ms: 2 }));
+        assert!(matches!(sink.log[3].command, AudioCommand::PlayBgm(_)));
+    }
+
+    /// `PlaySe` と `SetVolume` が混在しても投入順を維持する。
+    #[test]
+    fn test_fifo_play_se_set_volume_play_voice() {
+        let mut q = AudioCommandQueue::default();
+        q.push(AudioCommand::PlaySe("s".into()));
+        q.push(AudioCommand::SetVolume { track: AudioTrack::Se, volume: 0.3 });
+        q.push(AudioCommand::PlayVoice { voice_id: "v".into(), lip_sync: false });
+
+        let mut sink = RecordingAudioSink::default();
+        dispatch_audio_commands_to_sink(&mut q, &mut sink);
+
+        assert_eq!(sink.log.len(), 3);
+        assert!(matches!(sink.log[0].command, AudioCommand::PlaySe(_)));
+        assert!(matches!(
+            sink.log[1].command,
+            AudioCommand::SetVolume { track: AudioTrack::Se, .. }
+        ));
+        assert!(matches!(sink.log[2].command, AudioCommand::PlayVoice { .. }));
     }
 
     /// `audio-kira` オフ時: スタブマネージャでキューが確実に空になる（CI `--no-default-features`）。

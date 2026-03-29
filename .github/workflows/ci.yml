@@ -39,6 +39,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets ${{ matrix.args }} -- -D warnings
 
+      - name: engine_core feature flags (visibility)
+        run: cargo tree -p engine_core -e features --prefix depth
+
       - name: Test workspace
         run: cargo test --workspace ${{ matrix.args }}
 

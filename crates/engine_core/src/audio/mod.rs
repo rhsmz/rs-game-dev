@@ -32,6 +32,7 @@ pub use ecs_integration::{AudioCommand, AudioSource, AudioTrack};
 mod command_queue;
 pub use command_queue::{AudioCommandQueue, QueuedAudioCommand};
 
+/// `AudioCommand` の適用・FIFO 優先ルール・観測ログの約束は [`command_dispatch`](command_dispatch) を参照。
 mod command_dispatch;
 pub use command_dispatch::{audio_command_system, drain_audio_command_queue_with};
 
