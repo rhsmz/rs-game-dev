@@ -20,8 +20,12 @@ jobs:
             args: "--no-default-features"
           - os: windows-latest
             args: ""
+          - os: windows-latest
+            args: "--no-default-features"
           - os: macos-latest
             args: ""
+          - os: macos-latest
+            args: "--no-default-features"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,17 +54,17 @@ jobs:
       - name: engine_core feature flags (visibility)
         run: cargo tree -p engine_core -e features --prefix depth
 
-      - name: Test workspace
+      - name: "Test: workspace (unit + integration)"
         run: cargo test --workspace ${{ matrix.args }}
 
       # ワークスペース経由では依存クレートが engine_core の default を有効化するため、
       # kira 非リンク（スタブ音声）を別途検証する。
-      - name: engine_core audio stub (no kira)
+      - name: "Test: engine_core integration (audio stub, no kira)"
         if: matrix.args == '--no-default-features'
         run: cargo test -p engine_core --no-default-features
 
       # macOS: winit のイベントループはメインスレッド制約があり、libtest 並列時に失敗しうるため 1 スレッドに固定。
-      - name: Filament smoke (stub or FILAMENT_LIB_DIR in env)
+      - name: "Test: smoke (filament_smoke)"
         shell: bash
         run: |
           if [[ "${{ runner.os }}" == "macOS" ]]; then
