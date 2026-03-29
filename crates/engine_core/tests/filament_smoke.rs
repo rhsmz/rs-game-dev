@@ -1,6 +1,15 @@
 //! `filament` feature 有効時の 1 フレーム垂直スライス smoke（別プロセスで実行される統合テスト）。
 //!
 //! `winit` の `EventLoop` はプロセスあたり 1 回のみのため、ユニットテスト群と同居させない。
+//!
+//! Windows で公式プリビルトを `FILAMENT_LIB_DIR` に指定する場合、デバッグ CRT（`mdd`）と
+//! `cargo test` デバッグプロファイルの組み合わせでリンクが失敗することがある。実バイナリ検証は
+//! `lib/x86_64/md` と `cargo test -p engine_core --features filament --test filament_smoke --release` を推奨。
+//!
+//! ## Phase 2 readiness（P0-1）との対応
+//! - 1 フレーム: `begin_frame` → `render_system`（GameView → UiView の順）→ `end_frame`
+//! - スワップチェーンリサイズ: ウィンドウの `inner_size` を `RenderEngine::resize` に渡す
+//! - ECS: `Camera3D` + `MeshRenderer` を投入し、メッシュ幾何の Filament バインドは Phase 2 以降（現状はビュー描画とログで縦切りを検証）
 
 use engine_core::ecs::world::World;
 use engine_core::renderer::{
@@ -22,9 +31,11 @@ impl ApplicationHandler for FilamentOneFrameApp {
         self.test_result = (|| -> anyhow::Result<()> {
             let attrs = WindowAttributes::default().with_title("engine_core filament smoke");
             let window = event_loop.create_window(attrs)?;
+            let size = window.inner_size();
             let handle = window.window_handle()?.as_raw();
 
             let mut engine = RenderEngine::new(handle)?;
+            engine.resize(size.width, size.height);
             let game_view = GameView::new(&engine)?;
             let ui_view = UiView::new(&engine)?;
 
