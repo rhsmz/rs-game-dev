@@ -1,5 +1,7 @@
 //! `audio-kira` 無効時のスタブ（出力バックエンドをリンク・初期化しない）。
 
+#![allow(clippy::missing_const_for_fn)] // スタブは将来 kira 実装と API を揃えるのみ
+
 use crate::audio::AudioTrack;
 
 /// 音声出力なしのプレースホルダ（`--no-default-features` やヘッドレス CI 向け）。
@@ -8,6 +10,9 @@ pub struct GameAudioManager;
 
 impl GameAudioManager {
     /// 常に成功（デバイスを開かない）。
+    ///
+    /// # Errors
+    /// 現状は常に `Ok`（失敗経路なし）。
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }

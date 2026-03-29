@@ -23,6 +23,10 @@ pub enum AudioTrack {
 }
 
 /// Audio を操作するためのコマンド（ECS → `AudioSystem` 連携用）。
+///
+/// ## ファイルパスが解決できない場合
+/// `audio_command_system` は **warn ログを出して当該コマンドをスキップ**する（ゲーム継続優先）。
+/// 解決済みパスだがデコード／再生に失敗した場合も同様にスキップし、[`crate::audio::AudioLoadError`] 種別をログへ載せる。
 #[derive(Debug, Clone)]
 pub enum AudioCommand {
     PlayBgm(String),

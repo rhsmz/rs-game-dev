@@ -1,8 +1,22 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-28
-> **ビルド状態**: `cargo test --workspace` 全パス（engine_core は 71 passed / 3 ignored 相当）/ `cargo fmt` OK / `cargo clippy --workspace --all-targets` 警告 0 件
+> **最終更新**: 2026-03-29
+> **ビルド状態**: `cargo test --workspace` / `cargo test -p engine_core --no-default-features` / `cargo clippy --workspace --all-targets -- -D warnings` をローカルで確認すること
 > **現在ブランチ**: （作業ブランチに依存）
+
+## タスク完了時の記録（DoD）
+
+タスクを完了にチェックする前に、次を埋める（P1 / Phase 2 readiness 向け）。
+
+| 項目 | 記入例 |
+|------|--------|
+| **縦スライス完了**（動く最小経路） | 例: `audio_command_system` + スタブマネージャでキュー drain |
+| **本番要件完了**（デバイス・フィルタ込み） | 例: `kira` + 実出力は nightly `ignored` テスト |
+| **失敗時挙動** | 例: ファイルなしは warn + スキップ（`crates/engine_core/src/audio/mod.rs` のモジュール doc） |
+| **観測方法** | 例: `RUST_LOG=engine_core::audio=trace`、または該当テスト名 |
+| **検証コマンド** | 例: `cargo test -p engine_core --test audio_command_drain` |
+
+関連計画: [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md)
 
 ## Phase 0: プロジェクト基盤 ✅
 

@@ -15,6 +15,9 @@
 //!
 //! バックエンド切り替えの拡張: `kira` or `rodio`（将来）。
 
+mod error;
+pub use error::AudioLoadError;
+
 mod lip_sync;
 pub use lip_sync::calculate_lip_sync_value;
 
@@ -27,7 +30,7 @@ mod ecs_integration;
 pub use ecs_integration::{AudioCommand, AudioSource, AudioTrack};
 
 mod command_queue;
-pub use command_queue::AudioCommandQueue;
+pub use command_queue::{AudioCommandQueue, QueuedAudioCommand};
 
 mod command_dispatch;
 pub use command_dispatch::{audio_command_system, drain_audio_command_queue_with};

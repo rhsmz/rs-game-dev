@@ -3,7 +3,10 @@
 //! BGM / SE / Voice の 3 トラック構成を用意する。
 
 use anyhow::anyhow;
+use std::path::Path;
 use std::time::{Duration, Instant};
+
+use crate::audio::AudioLoadError;
 
 use kira::sound::static_sound::StaticSoundData;
 use kira::sound::static_sound::StaticSoundHandle;
@@ -70,22 +73,28 @@ impl GameAudioManager {
         Ok(handle)
     }
 
+    /// サウンドファイルをロードする（I/O / デコード失敗は [`AudioLoadError`]）。
+    ///
+    /// # Errors
+    /// - ファイル I/O 失敗
+    /// - コンテナ／サンプル形式のデコード失敗（`kira` / symphonia 経由）
+    pub fn load_sound_from_file(path: impl AsRef<Path>) -> Result<StaticSoundData, AudioLoadError> {
+        StaticSoundData::from_file(path.as_ref()).map_err(AudioLoadError::from_kira_file_error)
+    }
+
     /// BGM をファイルからロードする（雛形）。
     ///
     /// # Errors
     /// - ファイル読み込みやデコードが失敗した場合
-    pub fn load_bgm_from_file(
-        path: impl AsRef<std::path::Path>,
-    ) -> anyhow::Result<StaticSoundData> {
-        let sound_data = StaticSoundData::from_file(path).map_err(|e| anyhow!(e))?;
-        Ok(sound_data)
+    pub fn load_bgm_from_file(path: impl AsRef<Path>) -> anyhow::Result<StaticSoundData> {
+        Self::load_sound_from_file(path).map_err(|e| anyhow!(e))
     }
 
     /// SE をファイルからロードする（現状は BGM と同じデコード経路。将来トラック別検証を追加可能）。
     ///
     /// # Errors
     /// - ファイル読み込みやデコードが失敗した場合
-    pub fn load_se_from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<StaticSoundData> {
+    pub fn load_se_from_file(path: impl AsRef<Path>) -> anyhow::Result<StaticSoundData> {
         Self::load_bgm_from_file(path)
     }
 
@@ -93,9 +102,7 @@ impl GameAudioManager {
     ///
     /// # Errors
     /// - ファイル読み込みやデコードが失敗した場合
-    pub fn load_voice_from_file(
-        path: impl AsRef<std::path::Path>,
-    ) -> anyhow::Result<StaticSoundData> {
+    pub fn load_voice_from_file(path: impl AsRef<Path>) -> anyhow::Result<StaticSoundData> {
         Self::load_bgm_from_file(path)
     }
 

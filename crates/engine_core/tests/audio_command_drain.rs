@@ -1,7 +1,7 @@
 //! 音声キューの FIFO と `Play` / `Stop` / `SetVolume` 順序を、出力デバイスなしで検証する。
 
 use engine_core::audio::{
-    AudioCommand, AudioCommandQueue, AudioTrack, drain_audio_command_queue_with,
+    AudioCommand, AudioCommandQueue, AudioTrack, QueuedAudioCommand, drain_audio_command_queue_with,
 };
 use engine_core::ecs::world::World;
 
@@ -16,18 +16,20 @@ fn test_drain_audio_queue_play_stop_set_volume_order() -> anyhow::Result<()> {
     q.push(AudioCommand::PlayVoice { voice_id: "voice.wav".into(), lip_sync: false });
     world.insert_resource(q);
 
-    let mut seen = Vec::new();
-    drain_audio_command_queue_with(&mut world, |cmd| {
-        seen.push(cmd);
+    let mut seen: Vec<QueuedAudioCommand> = Vec::new();
+    drain_audio_command_queue_with(&mut world, |item| {
+        seen.push(item);
         Ok(())
     })?;
 
     assert_eq!(seen.len(), 5);
-    assert!(matches!(seen[0], AudioCommand::PlayBgm(_)));
-    assert!(matches!(seen[1], AudioCommand::StopBgm { .. }));
-    assert!(matches!(seen[2], AudioCommand::PlaySe(_)));
-    assert!(matches!(seen[3], AudioCommand::SetVolume { .. }));
-    assert!(matches!(seen[4], AudioCommand::PlayVoice { .. }));
+    assert_eq!(seen[0].seq, 1);
+    assert_eq!(seen[4].seq, 5);
+    assert!(matches!(seen[0].command, AudioCommand::PlayBgm(_)));
+    assert!(matches!(seen[1].command, AudioCommand::StopBgm { .. }));
+    assert!(matches!(seen[2].command, AudioCommand::PlaySe(_)));
+    assert!(matches!(seen[3].command, AudioCommand::SetVolume { .. }));
+    assert!(matches!(seen[4].command, AudioCommand::PlayVoice { .. }));
 
     let q_after = world
         .get_resource::<AudioCommandQueue>()
