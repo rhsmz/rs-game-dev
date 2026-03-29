@@ -2,8 +2,6 @@
 //!
 //! `Live2D` 合成用のオフスクリーンターゲットを想定する。
 
-use anyhow::anyhow;
-
 use crate::renderer::RenderEngine;
 
 /// オフスクリーンレンダターゲット（雛形）。
@@ -28,10 +26,12 @@ impl RenderTarget {
         self.height = height;
     }
 
-    /// `Live2D` 合成に使うための反映（雛形）。
+    /// `Live2D` 合成に使うための反映（足場段階）。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_for_live2d(&self, _engine: &RenderEngine) -> anyhow::Result<()> {
-        Err(anyhow!("RenderTarget.apply_for_live2d is not implemented yet"))
+    pub fn apply_for_live2d(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+        let _ = engine;
+        log::trace!("RenderTarget.apply_for_live2d (scaffold): {}x{}", self.width, self.height);
+        Ok(())
     }
 }
 

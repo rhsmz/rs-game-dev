@@ -58,10 +58,13 @@ impl SkyBox {
         self.environment_map = Some(map);
     }
 
-    /// Filament 側へ反映する（雛形）。
+    /// Filament 側へ反映する（足場段階）。
+    ///
+    /// 現状は Filament へは未接続。呼び出しは成功し、設定はメモリ上のみ保持される。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_to(&self, _engine: &RenderEngine) -> anyhow::Result<()> {
-        // TODO: Filament の IBL / SkyBox API を呼び出す。
-        Err(anyhow!("SkyBox.apply_to is not implemented yet"))
+    pub fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+        let _ = engine;
+        log::trace!("SkyBox.apply_to (scaffold): intensity={}", self.settings.intensity);
+        Ok(())
     }
 }

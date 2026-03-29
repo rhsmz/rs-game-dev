@@ -26,9 +26,3 @@ pub use components::MeshRenderer;
 
 mod render_system;
 pub use render_system::render_system;
-
-#[cfg(all(test, feature = "filament"))]
-mod filament_init_test;
-
-#[cfg(all(test, feature = "filament"))]
-mod multi_view_draw_test;

@@ -14,6 +14,8 @@ use kira::{
     AudioManager as KiraAudioManager, AudioManagerSettings, Decibels, DefaultBackend, Tween,
 };
 
+use super::AudioTrack;
+
 /// フェードアウト中のトラック。フェード完了推定時刻まで保持する。
 struct FadingTrack {
     _handle: TrackHandle,
@@ -199,6 +201,25 @@ impl GameAudioManager {
     pub fn calculate_lip_sync(&self, audio_samples: &[f32], frame_size: usize) -> f32 {
         crate::audio::calculate_lip_sync_value(audio_samples, frame_size)
     }
+
+    /// トラック全体の音量を線形（0.0〜1.0）で設定する（API 境界で dB に変換する）。
+    pub fn set_track_volume_linear(&mut self, track: AudioTrack, linear: f32, fade_ms: u64) {
+        let db = linear_volume_to_decibels(linear);
+        let tween = Tween { duration: Duration::from_millis(fade_ms), ..Default::default() };
+        match track {
+            AudioTrack::Bgm => self.bgm_track.set_volume(db, tween),
+            AudioTrack::Se => self.se_track.set_volume(db, tween),
+            AudioTrack::Voice => self.voice_track.set_volume(db, tween),
+        }
+    }
+}
+
+fn linear_volume_to_decibels(linear: f32) -> Decibels {
+    let x = linear.clamp(0.0, 1.0);
+    if x <= 1.0e-6 {
+        return Decibels::SILENCE;
+    }
+    Decibels::from(20.0 * x.log10())
 }
 
 #[cfg(test)]

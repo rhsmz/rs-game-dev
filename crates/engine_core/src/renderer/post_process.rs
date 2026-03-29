@@ -2,8 +2,6 @@
 //!
 //! `Bloom` / `Tone Mapping` / `Gaussian Blur` を後段で適用する想定。
 
-use anyhow::anyhow;
-
 use crate::renderer::RenderEngine;
 
 /// ポストプロセス設定（雛形）。
@@ -45,10 +43,16 @@ impl PostProcessPipeline {
         Self { settings }
     }
 
-    /// Filament 側へ反映する（雛形）。
+    /// Filament 側へ反映する（足場段階）。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_to(&self, _engine: &RenderEngine) -> anyhow::Result<()> {
-        Err(anyhow!("PostProcessPipeline.apply_to is not implemented yet"))
+    pub fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+        let _ = engine;
+        log::trace!(
+            "PostProcessPipeline.apply_to (scaffold): bloom={} tone_map={}",
+            self.settings.bloom_enabled,
+            self.settings.tone_mapping_enabled
+        );
+        Ok(())
     }
 }
 

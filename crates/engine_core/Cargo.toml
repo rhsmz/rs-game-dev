@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+autotests = false
 
 [dependencies]
 serde = { workspace = true }
@@ -23,7 +24,15 @@ rand_xoshiro = { workspace = true }
 [lints]
 workspace = true
 
+[build-dependencies]
+cc = "1"
+
 [features]
 # Filament を有効にする場合だけ、build.rs がリンク設定を行う。
 filament = []
 winit = []
+
+[[test]]
+name = "filament_smoke"
+path = "tests/filament_smoke.rs"
+required-features = ["filament"]

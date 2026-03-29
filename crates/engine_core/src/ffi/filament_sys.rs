@@ -70,4 +70,19 @@ unsafe extern "C" {
 
     /// Filament `SwapChain` を破棄する。
     pub(crate) fn SwapChain_destroy(swap_chain: *mut SwapChain);
+
+    /// `View` に `Scene` を関連付ける。
+    pub(crate) fn View_setScene(view: *mut View, scene: *mut Scene);
+
+    /// フレーム描画を開始する。成功時は非ゼロ（C の `bool` 相当）。
+    pub(crate) fn Renderer_beginFrame(swap_chain: *mut SwapChain, renderer: *mut Renderer) -> bool;
+
+    /// フレームを終了しスワップチェーンへ提出する。
+    pub(crate) fn Renderer_endFrame(renderer: *mut Renderer);
+
+    /// スワップチェーンのバックバッファをリサイズする。
+    pub(crate) fn SwapChain_resize(swap_chain: *mut SwapChain, width: u32, height: u32);
+
+    /// 単一 `View` を描画する（`beginFrame` / `endFrame` の間で呼ぶ）。
+    pub(crate) fn Renderer_render(renderer: *mut Renderer, view: *mut View);
 }
