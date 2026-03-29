@@ -175,6 +175,66 @@
 - [ ] Renderer / Audio の定点メトリクス設計（frame skip 率・audio drop 率など）
 - [ ] nightly 等での回帰トレンド監視・閾値超過通知の導線
 
+### 追加レビュー修正（独立ソースコードレビュー起点 / 2026-03-29）
+
+以下は **過去レビュー文書を参照せず**、`engine_core` の実装を直接読み直して抽出した
+「10点化タスク」（子タスク・孫タスク）である。
+
+#### A. ゲームエンジンのコアロジック完成度を 10 点にする
+
+- [ ] **A1. Renderer の実ジオメトリ責務を `renderable_id` 依存から脱却**  
+  （現状観測: `MeshRenderer` は `u32` のみ保持、`render_system` は `Scene_submit_mesh_vertical_slice` を呼ぶ縦スライス中心）
+  - [ ] A1-1. `MeshRenderer` に「リソースID」「描画可否状態」「破棄フック」を追加し、ID生値直渡しを廃止
+  - [ ] A1-2. `render_system` でメッシュ提出前に「ロード済み」「scene attach 済み」を明示検証
+  - [ ] A1-3. `GameView` 破棄時に detach/destroy の順序保証テストを追加（再入場時リーク防止）
+
+- [ ] **A2. Camera 仕様の決定性を強化（複数カメラ時）**  
+  （現状観測: `render_system` は storage 先頭カメラを採用）
+  - [ ] A2-1. カメラ選択戦略（priority or active flag）を Component に導入
+  - [ ] A2-2. 同 priority 衝突時の deterministic tie-break（Entity ID 昇順など）を仕様化
+  - [ ] A2-3. 複数カメラ回帰テスト（選択結果・view/proj 反映）を統合テストへ追加
+
+- [ ] **A3. Audio 異常系の仕様を運用レベルまで固定**  
+  （現状観測: warn は整備されているが、drop policy と再試行方針は暗黙）
+  - [ ] A3-1. queue drop の閾値・集約粒度・再通知間隔を定義し docs + テストへ反映
+  - [ ] A3-2. `backend` エラー時の再試行方針（即時/次フレーム/しない）をコマンド別に定義
+  - [ ] A3-3. `PlayVoice(lip_sync=true)` の「未接続」状態を TODO でなく状態遷移として扱う
+
+- [ ] **A4. Input/RNG/ECS の end-to-end 再現性テストを導入**
+  - [ ] A4-1. 1シナリオ統合テスト（入力イベント列→ECS→Audio/Renderer 呼び出し順）を追加
+  - [ ] A4-2. `LogicSeed` の派生鎖（親→子→孫）を scene salt と紐づけて固定検証
+  - [ ] A4-3. replay 用ログ（frame, input, seed, command seq）の最小フォーマットを策定
+
+- [ ] **A-DoD（10点到達条件）**
+  - [ ] 実メッシュ描画・カメラ選択・音声異常系を CI で再現できる
+  - [ ] 手動確認を要する判定項目を 0 へ削減
+
+#### B. ソースコードをエンタープライズ品質 10 点にする
+
+- [ ] **B1. 境界契約（契約違反時の動作）を API に明示**
+  - [ ] B1-1. `render_system` / `audio_command_system` の「前提条件」「失敗時動作」を rustdoc に追記
+  - [ ] B1-2. `#[must_use]` を戻り値契約がある API に追加（抜け漏れ監査を実施）
+  - [ ] B1-3. `panic` 非許容レイヤを定義し、`anyhow` 伝播ポリシーを文書化
+
+- [ ] **B2. テスト戦略を「ユニット中心」から「責務別階層」へ再編**
+  - [ ] B2-1. unit / integration / smoke / nightly の分類を `TASKS.MD` と CI 名称で一致
+  - [ ] B2-2. `#[ignore]` テストの解除条件（データ・環境・閾値）を各テストdocに記載
+  - [ ] B2-3. flaky 監視（過去N回成功率）を nightly artifact に保存
+
+- [ ] **B3. ログとメトリクスの標準化（監視可能性）**
+  - [ ] B3-1. `engine_core::renderer` / `engine_core::audio` のログキー辞書を docs 化
+  - [ ] B3-2. frame skip・mesh attach fail・audio drop を共通メトリクス名で定義
+  - [ ] B3-3. CI 失敗時にメトリクスと直近 warn を artifact 化してレビュー時間を短縮
+
+- [ ] **B4. unsafe/FFI 変更の監査可能性を強化**
+  - [ ] B4-1. FFI 呼び出し点ごとに `// SAFETY:` の期待不変条件をテンプレ化
+  - [ ] B4-2. `SAFETY.md` との不一致を検出するレビュー手順（チェックリスト）を運用化
+  - [ ] B4-3. Filament bridge 更新時の互換性確認手順（ABI/関数有無）を定型化
+
+- [ ] **B-DoD（10点到達条件）**
+  - [ ] required checks だけで品質合否を機械判定できる
+  - [ ] FFI/unsafe を含む変更が第三者レビューで再現可能
+
 ---
 
 ## Phase 2: ゲームロジック基盤
