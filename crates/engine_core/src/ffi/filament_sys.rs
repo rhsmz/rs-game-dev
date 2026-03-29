@@ -1,9 +1,23 @@
-//! Filament C API bindings（雛形）。
+//! Filament 向け **安定 C ABI**（`engine_core` 専用シム）。
 //!
-//! 現時点では Filament ライブラリ本体が無い前提でもコンパイル可能な
-//! `extern "C"` 宣言・opaque 型のみを提供します。
+//! [Google Filament](https://github.com/google/filament) の公開 API は C++ のみであり、
+//! `Engine_create` のようなプレーン C シンボルは公式バイナリには含まれません。
+//! ここに宣言している名前は **Rust 側の約束**であり、実体はスタブまたは C++ ブリッジが
+//! `extern "C"` でエクスポートします（公式エクスポートとの一致確認は `filament_stub.c` /
+//! `filament_bridge.cpp` とこのファイルの突き合わせで行う）。
 //!
-//! 実際に呼び出すラッパー（安全 API）は、以降の `renderer/` 側で実装します。
+//! | リンク方法 | 実装 |
+//! |------------|------|
+//! | `FILAMENT_LIB_DIR` **未設定** | `crates/engine_core/stub/filament_stub.c`（開発用スタブ、GPU 非依存） |
+//! | `FILAMENT_LIB_DIR` **設定** | `crates/engine_core/stub/filament_bridge.cpp` が公式 C++ API を呼び出し、下記シンボルをエクスポート |
+//!
+//! **Windows MSVC:** プリビルトの `mdd`（デバッグ CRT）を `cargo test` のデバッグプロファイルで
+//! そのままリンクすると、`__imp__CrtDbgReport` など CRT 関連の未解決が出ることがあります。
+//! 実 GPU での検証は `lib/x86_64/md`（または `mt`）と `cargo test --release`、または CI 向けに
+//! スタブ（`FILAMENT_LIB_DIR` 未設定）のデバッグ `cargo test` を使うと安定します。
+//!
+//! 破棄系は公式の [`Engine::destroy`](https://github.com/google/filament/blob/main/filament/include/filament/Engine.h) に合わせ、
+//! 対象リソースを所有している `Engine*` を必ず渡します（スタブ・ブリッジ共通 ABI）。
 
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
@@ -38,51 +52,49 @@ pub struct SwapChain {
     _private: [u8; 0],
 }
 
-// NOTE: 実際の C API シンボル名は Filament のバージョン/ビルド設定に依存します。
-//       ここでは後続実装のための足場として、代表的な関数名を宣言します。
 unsafe extern "C" {
-    /// Filament Engine を生成する。
+    /// `filament::Engine::create()` に相当。
     pub(crate) fn Engine_create() -> *mut Engine;
 
-    /// Filament Engine を破棄する。
+    /// `filament::Engine::destroy(Engine*)` に相当。
     pub(crate) fn Engine_destroy(engine: *mut Engine);
 
-    /// Filament Scene を生成する。
+    /// `engine->createScene()` に相当。
     pub(crate) fn Scene_create(engine: *mut Engine) -> *mut Scene;
 
-    /// Filament Scene を破棄する。
-    pub(crate) fn Scene_destroy(scene: *mut Scene);
+    /// `engine->destroy(Scene*)` に相当。
+    pub(crate) fn Scene_destroy(engine: *mut Engine, scene: *mut Scene);
 
-    /// Filament View を生成する。
+    /// `engine->createView()` に相当。
     pub(crate) fn View_create(engine: *mut Engine) -> *mut View;
 
-    /// Filament View を破棄する。
-    pub(crate) fn View_destroy(view: *mut View);
+    /// `engine->destroy(View*)` に相当。
+    pub(crate) fn View_destroy(engine: *mut Engine, view: *mut View);
 
-    /// Filament Renderer を生成する。
+    /// `engine->createRenderer()` に相当。
     pub(crate) fn Renderer_create(engine: *mut Engine) -> *mut Renderer;
 
-    /// Filament Renderer を破棄する。
-    pub(crate) fn Renderer_destroy(renderer: *mut Renderer);
+    /// `engine->destroy(Renderer*)` に相当。
+    pub(crate) fn Renderer_destroy(engine: *mut Engine, renderer: *mut Renderer);
 
-    /// Filament `SwapChain` を生成する。
+    /// ヘッドレス `engine->createSwapChain(w, h)`（スモーク用。ウィンドウ連携は後続）。
     pub(crate) fn SwapChain_create(engine: *mut Engine) -> *mut SwapChain;
 
-    /// Filament `SwapChain` を破棄する。
-    pub(crate) fn SwapChain_destroy(swap_chain: *mut SwapChain);
+    /// `engine->destroy(SwapChain*)` に相当。
+    pub(crate) fn SwapChain_destroy(engine: *mut Engine, swap_chain: *mut SwapChain);
 
-    /// `View` に `Scene` を関連付ける。
+    /// `view->setScene(scene)` に相当。
     pub(crate) fn View_setScene(view: *mut View, scene: *mut Scene);
 
-    /// フレーム描画を開始する。成功時は非ゼロ（C の `bool` 相当）。
+    /// `renderer->beginFrame(swapChain)` に相当。
     pub(crate) fn Renderer_beginFrame(swap_chain: *mut SwapChain, renderer: *mut Renderer) -> bool;
 
-    /// フレームを終了しスワップチェーンへ提出する。
+    /// `renderer->endFrame()` に相当。
     pub(crate) fn Renderer_endFrame(renderer: *mut Renderer);
 
-    /// スワップチェーンのバックバッファをリサイズする。
+    /// 公式に直接対応する API が無いため、ブリッジでは no-op。ビューポート更新は別 API で行う予定。
     pub(crate) fn SwapChain_resize(swap_chain: *mut SwapChain, width: u32, height: u32);
 
-    /// 単一 `View` を描画する（`beginFrame` / `endFrame` の間で呼ぶ）。
+    /// `renderer->render(view)` に相当。
     pub(crate) fn Renderer_render(renderer: *mut Renderer, view: *mut View);
 }

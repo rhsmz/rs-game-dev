@@ -1,5 +1,9 @@
-/* Minimal Filament C API stub for local builds when FILAMENT_LIB_DIR is unset.
- * Symbols must match `crates/engine_core/src/ffi/filament_sys.rs` declarations.
+/* FILAMENT_LIB_DIR 未設定時のみビルドに含まれる開発用スタブ（公式 API の C ラッパではない）。
+ *
+ * 方針:
+ * - プリビルト／自前ビルドをリンクするときは filament_bridge.cpp が同じ extern "C" 名で実装する。
+ * - スタブは公式ヘッダに追従する必要はなく、filament_sys.rs とブリッジとでシグネチャを三点一致させる。
+ * - GPU や Filament ランタイムに依存しないため、`cargo test`（デバッグ）を常に通しやすくする。
  */
 #include <stdbool.h>
 #include <stdlib.h>
@@ -23,7 +27,8 @@ Scene *Scene_create(Engine *engine) {
     return (Scene *)calloc(1u, sizeof(void *));
 }
 
-void Scene_destroy(Scene *scene) {
+void Scene_destroy(Engine *engine, Scene *scene) {
+    (void)engine;
     free(scene);
 }
 
@@ -32,7 +37,8 @@ View *View_create(Engine *engine) {
     return (View *)calloc(1u, sizeof(void *));
 }
 
-void View_destroy(View *view) {
+void View_destroy(Engine *engine, View *view) {
+    (void)engine;
     free(view);
 }
 
@@ -46,7 +52,8 @@ Renderer *Renderer_create(Engine *engine) {
     return (Renderer *)calloc(1u, sizeof(void *));
 }
 
-void Renderer_destroy(Renderer *renderer) {
+void Renderer_destroy(Engine *engine, Renderer *renderer) {
+    (void)engine;
     free(renderer);
 }
 
@@ -55,7 +62,8 @@ SwapChain *SwapChain_create(Engine *engine) {
     return (SwapChain *)calloc(1u, sizeof(void *));
 }
 
-void SwapChain_destroy(SwapChain *swap_chain) {
+void SwapChain_destroy(Engine *engine, SwapChain *swap_chain) {
+    (void)engine;
     free(swap_chain);
 }
 
