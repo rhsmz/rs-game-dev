@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            args: ""
+          - os: ubuntu-latest
+            args: "--no-default-features"
+          - os: windows-latest
+            args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Linux dependencies (winit / audio / headless display)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libudev-dev libwayland-dev libxkbcommon-dev xvfb
+
+      - run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets ${{ matrix.args }} -- -D warnings
+
+      - name: Test workspace
+        run: cargo test --workspace ${{ matrix.args }}
+
+      - name: Filament smoke (stub or FILAMENT_LIB_DIR in env)
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            xvfb-run -a cargo test -p engine_core --features filament --test filament_smoke
+          else
+            cargo test -p engine_core --features filament --test filament_smoke
+          fi
