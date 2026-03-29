@@ -35,6 +35,7 @@ pub struct SpriteRenderer {
     sprites: Vec<Sprite>,
 }
 
+#[allow(dead_code)] // `render` は Phase 2 の Filament Quad 投入まで未配線。
 impl SpriteRenderer {
     /// 新しい `SpriteRenderer` を作成する。
     #[must_use]
@@ -47,11 +48,12 @@ impl SpriteRenderer {
         self.sprites.push(sprite);
     }
 
-    /// 現在投入されているスプライトを描画する（足場段階）。
+    /// 現在投入されているスプライトを描画する（crate 内・足場専用）。
     ///
     /// Filament への Quad 投入は未実装。投入済みスプライトはクリアされ、エラーにはしない。
     #[allow(clippy::missing_errors_doc)]
-    pub fn render(&mut self, engine: &mut RenderEngine) -> anyhow::Result<()> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(crate) fn render(&mut self, engine: &RenderEngine) -> anyhow::Result<()> {
         let _ = engine;
         let count = self.sprites.len();
         self.sprites.clear();

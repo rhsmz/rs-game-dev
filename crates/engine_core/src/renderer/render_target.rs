@@ -11,6 +11,7 @@ pub struct RenderTarget {
     pub height: u32,
 }
 
+#[allow(dead_code)] // `apply_for_live2d` は Phase 2 の RTT 連携まで未配線。
 impl RenderTarget {
     /// 新しい `RenderTarget` を作成する（雛形）。
     #[must_use]
@@ -26,9 +27,10 @@ impl RenderTarget {
         self.height = height;
     }
 
-    /// `Live2D` 合成に使うための反映（足場段階）。
+    /// `Live2D` 合成に使うための反映（crate 内・足場専用）。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_for_live2d(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(crate) fn apply_for_live2d(self, engine: &RenderEngine) -> anyhow::Result<()> {
         let _ = engine;
         log::trace!("RenderTarget.apply_for_live2d (scaffold): {}x{}", self.width, self.height);
         Ok(())

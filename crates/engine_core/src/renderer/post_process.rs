@@ -35,6 +35,7 @@ pub struct PostProcessPipeline {
     pub settings: PostProcessSettings,
 }
 
+#[allow(dead_code)] // `apply_to` は Phase 2 のポストプロセス連携まで未配線。
 impl PostProcessPipeline {
     /// パイプラインを生成する（雛形）。
     #[must_use]
@@ -43,9 +44,10 @@ impl PostProcessPipeline {
         Self { settings }
     }
 
-    /// Filament 側へ反映する（足場段階）。
+    /// Filament 側へ反映する（crate 内・足場専用）。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+    #[allow(clippy::unnecessary_wraps)]
+    pub(crate) fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
         let _ = engine;
         log::trace!(
             "PostProcessPipeline.apply_to (scaffold): bloom={} tone_map={}",

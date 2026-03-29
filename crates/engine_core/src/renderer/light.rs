@@ -45,6 +45,7 @@ impl HdrEnvironmentMap {
     }
 }
 
+#[allow(dead_code)] // `apply_to` は Phase 2 のレンダラ統合まで未配線（API 面のみ先行）。
 impl SkyBox {
     /// `SkyBox` を生成する（雛形）。
     #[must_use]
@@ -58,11 +59,13 @@ impl SkyBox {
         self.environment_map = Some(map);
     }
 
-    /// Filament 側へ反映する（足場段階）。
+    /// Filament 側へ反映する（crate 内・足場専用）。
     ///
-    /// 現状は Filament へは未接続。呼び出しは成功し、設定はメモリ上のみ保持される。
+    /// 公開型は先行しているが、Filament 接続は Phase 2 以降。外部クレートからは呼ばず、
+    /// 将来 `engine_core` 内のシステムからのみ利用する想定。
     #[allow(clippy::missing_errors_doc)]
-    pub fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
+    #[allow(clippy::unnecessary_wraps)] // 将来 Filament 連携時にエラー返却する足場 API
+    pub(crate) fn apply_to(&self, engine: &RenderEngine) -> anyhow::Result<()> {
         let _ = engine;
         log::trace!("SkyBox.apply_to (scaffold): intensity={}", self.settings.intensity);
         Ok(())
