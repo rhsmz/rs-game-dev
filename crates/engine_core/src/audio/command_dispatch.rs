@@ -270,13 +270,19 @@ pub fn drain_audio_command_queue_with(
 
 /// `AudioCommandQueue` を空にし、[`GameAudioManager`] へ反映する。
 ///
+/// # 呼び出し側の契約（境界）
+/// - `World` に [`AudioCommandQueue`] が無い場合は **何もしない**（早期 return）。
+/// - キューを一時的に `remove_resource` するため、**同一フレーム内に二重呼び出し**すると 2 回目はキュー不在で no-op になる。通常はスケジュール上 1 回のみ呼ぶこと。
+///
 /// # 推奨ステージ
 /// ECS の `PostUpdate`（ロジック確定後に音声へ反映することを推奨）。
 ///
 /// # 同一フレームの優先度
 /// キューは FIFO。`StopBgm` を先に積めば、その後の `PlayBgm` が意図どおり効く。
 ///
-/// `GameAudioManager` リソースが無い場合、保留コマンドは破棄し警告ログを出す。
+/// # 縮退時の動作
+/// [`GameAudioManager`] リソースが無い場合、保留コマンドは **すべて破棄**し **warn** ログを出す
+/// （`AUDIO_QUEUE_DROP_BULK_WARN_THRESHOLD` 超で追加 warn）。
 pub fn audio_command_system(world: &mut World) {
     let Some(mut queue) = world.remove_resource::<AudioCommandQueue>() else {
         return;

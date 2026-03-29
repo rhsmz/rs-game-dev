@@ -133,7 +133,7 @@ impl GameAudioManager {
     ///
     /// 旧トラックをフェードアウトしつつ新トラックをフェードインする。
     /// 旧 `TrackHandle` は `fading_out_bgm_tracks` に退避し、drop による即時削除を防ぐ。
-    /// 退避したトラックは次回クロスフェード時または [`purge_faded_tracks`] で解放する。
+    /// 退避したトラックは次回クロスフェード時または [`purge_faded_tracks`](Self::purge_faded_tracks) で解放する。
     ///
     /// # Errors
     /// - `TrackHandle::play` が失敗した場合
