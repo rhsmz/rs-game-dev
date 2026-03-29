@@ -172,3 +172,34 @@ Turn the current pre-Phase-2 findings into an executable plan that closes critic
 - **Go** only when all P0 DoD items are met and evidenced in CI artifacts.
 - **Conditional Go** allowed if one P1 item is open but risk is explicitly accepted.
 - **No-Go** if renderer one-frame smoke or audio ECS command path is still missing.
+
+---
+
+## 実施状況ログ（2026-03-29 更新）
+
+### P0-1 Renderer 縦切り
+- [x] フレーム契約: `begin_frame` → `render_system`（**GameView → UiView** 順をコードコメントで固定）→ `end_frame`
+- [x] `filament_smoke`: ウィンドウ `inner_size` を `RenderEngine::resize` に渡す
+- [x] ECS で `Camera3D` + `MeshRenderer` 投入、カメラ欠如時はメッシュ系スキップ（既存挙動）
+- [x] 診断ログ: `target = "engine_core::renderer"` で初期化・縦切りフレームを `info`/`debug`
+- [ ] **残:** Filament への実メッシュ投入（三角形／マテリアル）— Phase 2 本体タスク。現状 DoD は「1 フレーム・順序・リサイズ・ECS 縦切り」まででエビデンス化
+
+### P0-2 公開 API の足場
+- [x] `SkyBox::apply_to` / `SpriteRenderer::render` / `RenderTarget::apply_for_live2d` / `PostProcessPipeline::apply_to` を **`pub(crate)`** に変更（外部から足場を誤用しない）
+- [x] Phase 2 まで未配線であることをドキュメント化、`dead_code` 許可は足場専用とコメント
+
+### P0-3 Audio ECS
+- [x] `audio_command_system` + キュー FIFO（既存）
+- [x] **E2E テスト** `test_audio_ecs_set_volume_end_to_end`（`#[ignore]` — 音声バックエンド依存、ローカルは `cargo test -p engine_core test_audio_ecs_set_volume_end_to_end -- --ignored` で実行）
+
+### P1-1 CI
+- [x] `.github/workflows/ci.yml`: `fmt` / `clippy` / `test --workspace`、行列で `ubuntu` + `--no-default-features`、`windows`
+- [x] `cargo test -p engine_core --features filament --test filament_smoke` を毎ジョブで実行（スタブリンク想定）
+
+### P1-2 Unsafe ガバナンス
+- [x] `crates/engine_core/SAFETY.md` 新設
+- [x] `view.rs` モジュール Doc から参照
+- [x] `.github/pull_request_template.md` に unsafe チェックリスト
+
+### P1-3 / P2-1
+- [ ] トラッキング運用の刷新、追加統合テスト — 未着手（Stretch）
