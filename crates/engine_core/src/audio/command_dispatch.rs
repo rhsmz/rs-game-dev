@@ -1,5 +1,6 @@
 //! `AudioCommand` を `GameAudioManager` へ適用する。
 
+#[cfg(feature = "audio-kira")]
 use std::path::Path;
 
 use crate::ecs::world::World;
@@ -8,6 +9,7 @@ use super::command_queue::AudioCommandQueue;
 use super::ecs_integration::AudioCommand;
 use super::manager::GameAudioManager;
 
+#[cfg(feature = "audio-kira")]
 fn apply_audio_command(manager: &mut GameAudioManager, cmd: AudioCommand) -> anyhow::Result<()> {
     match cmd {
         AudioCommand::PlayBgm(path_or_id) => {
@@ -34,7 +36,7 @@ fn apply_audio_command(manager: &mut GameAudioManager, cmd: AudioCommand) -> any
                 );
                 return Ok(());
             }
-            let data = GameAudioManager::load_bgm_from_file(p)?;
+            let data = GameAudioManager::load_se_from_file(p)?;
             let _handle = manager.play_se(data)?;
             Ok(())
         }
@@ -49,7 +51,7 @@ fn apply_audio_command(manager: &mut GameAudioManager, cmd: AudioCommand) -> any
                 );
                 return Ok(());
             }
-            let data = GameAudioManager::load_bgm_from_file(p)?;
+            let data = GameAudioManager::load_voice_from_file(p)?;
             let _handle = manager.play_voice(data)?;
             Ok(())
         }
@@ -58,6 +60,12 @@ fn apply_audio_command(manager: &mut GameAudioManager, cmd: AudioCommand) -> any
             Ok(())
         }
     }
+}
+
+#[cfg(not(feature = "audio-kira"))]
+fn apply_audio_command(_manager: &mut GameAudioManager, cmd: AudioCommand) -> anyhow::Result<()> {
+    log::trace!("audio-kira feature disabled; ignoring audio command {cmd:?}");
+    Ok(())
 }
 
 /// キュー内のコマンドを順に適用する（デバイス非依存テスト用シンク差し替え）。
@@ -94,6 +102,27 @@ fn dispatch_audio_commands_to_sink<S: AudioCommandSink>(
             log::warn!("audio command failed: {e:#}");
         }
     }
+}
+
+/// `AudioCommandQueue` を一時的に取り出し、各コマンドを `f` に渡してからキューを戻す（検証・ツール向け）。
+///
+/// `GameAudioManager` を介さないため、出力デバイスに依存しない。本番ループでは [`audio_command_system`] を使うこと。
+///
+/// # Errors
+/// - `f` が `Err` を返したとき、その時点で処理を打ち切り、未処理コマンドはキューに戻さない（既に drain 済み分は失う）。
+///   テストでは `f` を常に成功させることを推奨する。
+pub fn drain_audio_command_queue_with(
+    world: &mut World,
+    mut f: impl FnMut(AudioCommand) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    let Some(mut queue) = world.remove_resource::<AudioCommandQueue>() else {
+        return Ok(());
+    };
+    for cmd in queue.pending.drain(..) {
+        f(cmd)?;
+    }
+    world.insert_resource(queue);
+    Ok(())
 }
 
 /// `AudioCommandQueue` を空にし、[`GameAudioManager`] へ反映する。
@@ -163,10 +192,28 @@ mod tests {
         assert!(q_after.is_empty());
     }
 
-    /// P0-3: ECS リソース上のキュー → `audio_command_system` → `GameAudioManager` の縦切り（ローカル検証用）。
+    /// `audio-kira` オフ時: スタブマネージャでキューが確実に空になる（CI `--no-default-features`）。
+    #[cfg(not(feature = "audio-kira"))]
     #[test]
-    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
-    fn test_audio_ecs_set_volume_end_to_end() {
+    fn test_audio_ecs_set_volume_drains_with_stub_manager() {
+        let mut world = World::new();
+        let manager = GameAudioManager::new().expect("stub backend");
+        world.insert_resource(manager);
+        let mut q = AudioCommandQueue::default();
+        q.push(AudioCommand::SetVolume { track: AudioTrack::Bgm, volume: 0.42 });
+        world.insert_resource(q);
+
+        audio_command_system(&mut world);
+
+        let q_after = world.get_resource::<AudioCommandQueue>().expect("queue reinserted");
+        assert!(q_after.is_empty());
+    }
+
+    /// 実 `kira` バックエンド＋出力デバイスが必要。nightly の `cargo test -- --ignored` 向け。
+    #[cfg(feature = "audio-kira")]
+    #[test]
+    #[ignore = "音声デバイス/バックエンドに依存するため、通常 CI ではスキップ（nightly の ignored ジョブで実行）"]
+    fn test_audio_ecs_set_volume_end_to_end_kira() {
         let mut world = World::new();
         let manager = GameAudioManager::new().expect("kira backend");
         world.insert_resource(manager);

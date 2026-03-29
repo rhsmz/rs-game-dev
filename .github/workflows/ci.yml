@@ -42,6 +42,12 @@ jobs:
       - name: Test workspace
         run: cargo test --workspace ${{ matrix.args }}
 
+      # ワークスペース経由では依存クレートが engine_core の default を有効化するため、
+      # kira 非リンク（スタブ音声）を別途検証する。
+      - name: engine_core audio stub (no kira)
+        if: matrix.args == '--no-default-features'
+        run: cargo test -p engine_core --no-default-features
+
       - name: Filament smoke (stub or FILAMENT_LIB_DIR in env)
         shell: bash
         run: |

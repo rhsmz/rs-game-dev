@@ -1,4 +1,4 @@
-//! AudioManager（kira ラッパー）雛形。
+//! [`GameAudioManager`] の `kira` 実装（ラッパー雛形）。
 //!
 //! BGM / SE / Voice の 3 トラック構成を用意する。
 
@@ -7,14 +7,13 @@ use std::time::{Duration, Instant};
 
 use kira::sound::static_sound::StaticSoundData;
 use kira::sound::static_sound::StaticSoundHandle;
-/// `kira` の `AudioManager` が提供するミキサー。
 use kira::track::{TrackBuilder, TrackHandle};
 
 use kira::{
     AudioManager as KiraAudioManager, AudioManagerSettings, Decibels, DefaultBackend, Tween,
 };
 
-use super::AudioTrack;
+use crate::audio::AudioTrack;
 
 /// フェードアウト中のトラック。フェード完了推定時刻まで保持する。
 struct FadingTrack {
@@ -80,6 +79,24 @@ impl GameAudioManager {
     ) -> anyhow::Result<StaticSoundData> {
         let sound_data = StaticSoundData::from_file(path).map_err(|e| anyhow!(e))?;
         Ok(sound_data)
+    }
+
+    /// SE をファイルからロードする（現状は BGM と同じデコード経路。将来トラック別検証を追加可能）。
+    ///
+    /// # Errors
+    /// - ファイル読み込みやデコードが失敗した場合
+    pub fn load_se_from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<StaticSoundData> {
+        Self::load_bgm_from_file(path)
+    }
+
+    /// Voice をファイルからロードする（現状は BGM と同じデコード経路。将来トラック別検証を追加可能）。
+    ///
+    /// # Errors
+    /// - ファイル読み込みやデコードが失敗した場合
+    pub fn load_voice_from_file(
+        path: impl AsRef<std::path::Path>,
+    ) -> anyhow::Result<StaticSoundData> {
+        Self::load_bgm_from_file(path)
     }
 
     /// BGM をループ再生する（雛形）。
@@ -231,7 +248,7 @@ mod tests {
     use kira::sound::static_sound::StaticSoundSettings;
 
     #[test]
-    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
+    #[ignore = "音声デバイス/バックエンドに依存するため、通常 CI ではスキップ（nightly の ignored ジョブで実行）"]
     fn test_game_audio_manager_play_bgm_returns_ok() -> anyhow::Result<()> {
         let mut manager = GameAudioManager::new()?;
 
@@ -250,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
+    #[ignore = "音声デバイス/バックエンドに依存するため、通常 CI ではスキップ（nightly の ignored ジョブで実行）"]
     fn test_play_bgm_loop_zero_loop_end_plays_to_end() -> anyhow::Result<()> {
         let mut manager = GameAudioManager::new()?;
         let frames: std::sync::Arc<[Frame]> = (0..4410).map(|_| Frame::from_mono(0.0)).collect();
@@ -267,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
+    #[ignore = "音声デバイス/バックエンドに依存するため、通常 CI ではスキップ（nightly の ignored ジョブで実行）"]
     fn test_crossfade_bgm_to_preserves_source_volume() -> anyhow::Result<()> {
         use kira::Value;
         let mut manager = GameAudioManager::new()?;
