@@ -103,6 +103,22 @@ mod tests {
         assert_ne!(c0, c2);
     }
 
+    // 親→子→孫の 3 段鎖。`salt` はシーン ID 等の文脈ラベル想定（A4-2）。
+    #[test]
+    fn test_derive_child_seed_parent_child_grandchild_chain() {
+        let root = LogicSeed::from_u64(0xDEAD_BEEF_0000_0001);
+        let scene_a: u64 = 100; // 遷移先シーン A
+        let scene_b: u64 = 200; // A から B へ
+
+        let child = derive_child_seed(&root, scene_a);
+        let grandchild = derive_child_seed(&child, scene_b);
+
+        // 同一入力なら常に同一出力（リプレイ再現性）
+        assert_eq!(grandchild, derive_child_seed(&derive_child_seed(&root, scene_a), scene_b));
+        // 中間 salt を変えると孫は変わる
+        assert_ne!(grandchild, derive_child_seed(&derive_child_seed(&root, scene_a ^ 1), scene_b));
+    }
+
     #[test]
     fn test_logic_rng_uniform_buckets_loose() {
         const BINS: usize = 8;
