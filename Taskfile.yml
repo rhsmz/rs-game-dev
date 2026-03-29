@@ -5,8 +5,12 @@ includes:
   submodules:
     taskfile: ./third_party/Taskfile.yml
     dir: .
+    optional: true
+    # 短い別名: task third-party:init / task tp:filament:prebuilt など
+    aliases: [third-party, tp]
 
-# サブモジュール運用: task submodules:init / submodules:status など（定義は third_party/Taskfile.yml）
+# サブモジュール運用: task submodules:init（別名 third-party:init / tp:init）
+# third_party が未 checkout のときは includes がスキップされる。先に `git submodule update --init third_party` を実行してください。
 
 # ═══════════════════════════════════════════════════════════════
 #  ビルドモードの使い分け
@@ -200,6 +204,24 @@ tasks:
     desc: "依存クレートの更新確認を行う（cargo outdated）"
     cmds:
       - cargo outdated
+
+  deps:filament:
+    desc: "Filament 公式プリビルトを展開する（scripts/ を実行・third_party/filament_prebuilt/VERSION 使用）"
+    cmds:
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File third_party/scripts/fetch_filament_prebuilt.ps1
+        platforms: [windows]
+      - cmd: bash third_party/scripts/fetch_filament_prebuilt.sh
+        platforms: [linux, darwin]
+
+  deps:setup:
+    desc: "全サブモジュールを再帰初期化し、続けて Filament プリビルトを展開する（ローカル環境の一括セットアップ）"
+    cmds:
+      - git submodule sync --recursive
+      - git submodule update --init --recursive
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File third_party/scripts/fetch_filament_prebuilt.ps1
+        platforms: [windows]
+      - cmd: bash third_party/scripts/fetch_filament_prebuilt.sh
+        platforms: [linux, darwin]
 
   audit:
     desc: "セキュリティ脆弱性の監査を実行する（cargo audit）"
