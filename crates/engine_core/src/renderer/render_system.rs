@@ -1,4 +1,15 @@
 //! Renderer System（雛形）。
+//!
+//! # 呼び出し側の契約（境界）
+//! - **スレッド**: メインスレッド（または Filament を所有するスレッド）から呼ぶこと。
+//!   [`GameView`] / [`UiView`] の `Send`/`Sync` 前提は [`SAFETY.md`](../../SAFETY.md) 参照。
+//! - **前提**: [`RenderEngine::begin_frame`] が `true` のフレーム内で呼ぶ。`false` のフレームでは呼ばない。
+//! - **終了**: 呼び出し後に必ず [`RenderEngine::end_frame`] を実行する。
+//!
+//! # 失敗・縮退時の動作（フェイルファストしない経路）
+//! - `Camera3D` が 0 体: メッシュ提出は行わず、Game/UI ビューの `Renderer_render` のみ実行する（`debug` ログ）。
+//! - [`crate::renderer::MeshRenderer::renderable_id`] が 0: **warn** し当該エンティティはスキップ（未ロード扱い）。
+//! - Filament 縦スライス FFI が `false`: **warn** し当該メッシュのみスキップ（他メッシュ・ビュー描画は継続）。
 
 use crate::ecs::world::World;
 use crate::renderer::{GameView, RenderEngine, UiView};
