@@ -11,10 +11,13 @@
 //! - スワップチェーンリサイズ: ウィンドウの `inner_size` を `RenderEngine::resize` に渡す（テストでは追加で解像度変更を挟み投影同期の退行を防ぐ）
 //! - `ENGINE_CORE_RENDER_TRACE=1` 時は描画パス順（game_view → ui_view）をバッファに記録し、テストで検証する
 //! - `ENGINE_CORE_MESH_SUBMIT_TRACE=1` 時は Game `Scene` へのメッシュ縦スライス投入（非ゼロ `renderable_id` の受理回数と `id==0` スキップ）をカウントする
-//! - ECS: `Camera3D` + `MeshRenderer`（`renderable_id` 非ゼロと 0 の混在）で投入経路を検証。実ジオメトリの `RenderableManager` 結線はブリッジ TODO で置換予定
+//! - ECS: `Camera3D` + `MeshRenderer`（`renderable_id` 非ゼロと 0 の混在）で投入経路を検証。`FILAMENT_LIB_DIR` 指定時は C++ ブリッジで三角形＋既定マテリアルが `Scene` に結線される（スタブは幾何なしのまま）
+//!
+//! ## `#[ignore]` テストの解除条件（B2-2）
+//! - [`test_game_ui_overlap_visual_regression_placeholder`]: ゴールデン画像ハーネス（固定解像度・許容誤差・オフスクリーン RT・CI アーティファクト）を導入し、Game/UI 重畳フレームのベースライン画像をリポジトリまたはキャッシュ可能なストアに置けること。
 //!
 //! ## Visual golden / ピクセル一致（将来）
-//! - ゴールデン画像ハーネス（プラットフォーム固定解像度・許容誤差・オフスクリーン RT）を導入してから [`test_game_ui_overlap_visual_regression_placeholder`] を有効化する。
+//! - ゴールデン画像ハーネスを導入してから上記プレースホルダを有効化する。
 //! - 採用条件の詳細は [`plan/15_phase2_readiness_plan.md`](../../plan/15_phase2_readiness_plan.md) の Renderer DoD / visual 節を参照。
 
 use engine_core::ecs::world::World;
