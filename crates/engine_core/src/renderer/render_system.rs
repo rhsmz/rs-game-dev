@@ -19,6 +19,7 @@ use crate::renderer::{Camera3D, MeshRenderer};
 ///
 /// # カメラ欠如時
 /// カメラが 1 体も無い場合はメッシュ系の投入をスキップし、ビューのみ描画する（フェイルファストしない）。
+#[allow(clippy::missing_const_for_fn)]
 pub fn render_system(world: &World, engine: &mut RenderEngine, game: &GameView, ui: &UiView) {
     #[cfg(feature = "filament")]
     {
@@ -27,12 +28,22 @@ pub fn render_system(world: &World, engine: &mut RenderEngine, game: &GameView, 
 
         if cam_count == 0 {
             log::debug!(
+                target: "engine_core::renderer",
                 "render_system: no Camera3D entities; skipping mesh submission (views still rendered)"
             );
+        } else if mesh_count > 0 {
+            log::info!(
+                target: "engine_core::renderer",
+                "render_system: vertical_slice frame — mesh_entities={mesh_count} camera_entities={cam_count} (Filament geometry binding is Phase 2+; GameView then UiView render order enforced)"
+            );
         } else {
-            log::trace!("render_system: mesh_entities={mesh_count} camera_entities={cam_count}");
+            log::trace!(
+                target: "engine_core::renderer",
+                "render_system: mesh_entities=0 camera_entities={cam_count}"
+            );
         }
 
+        // P0-1: Game View を先に、UI View を後に描画（アーキテクチャの Z オーダー方針に一致）。
         engine.render_filament_view(Some(game.filament_view_ptr()));
         engine.render_filament_view(Some(ui.filament_view_ptr()));
     }

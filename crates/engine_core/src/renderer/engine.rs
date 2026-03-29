@@ -52,12 +52,15 @@ impl RenderEngine {
             let swap_chain_ptr = unsafe { filament_sys::SwapChain_create(engine.as_ptr()) };
             let swap_chain = NonNull::new(swap_chain_ptr).ok_or_else(|| {
                 // SAFETY: `renderer` と `engine` は生成済みなので、ここで破棄してリークを防ぐ。
-                unsafe { filament_sys::Renderer_destroy(renderer.as_ptr()) };
+                unsafe { filament_sys::Renderer_destroy(engine.as_ptr(), renderer.as_ptr()) };
                 unsafe { filament_sys::Engine_destroy(engine.as_ptr()) };
                 anyhow!("Filament SwapChain_create returned null")
             })?;
 
-            log::trace!("RenderEngine: Engine, Renderer, SwapChain initialized");
+            log::debug!(
+                target: "engine_core::renderer",
+                "RenderEngine: Filament Engine, Renderer, SwapChain initialized (resize + viewport to be applied per frame)"
+            );
             Ok(Self { engine, renderer, swap_chain })
         }
 
@@ -72,6 +75,7 @@ impl RenderEngine {
     ///
     /// `false` のときは描画をスキップし、呼び出し側は `render_system` を呼ばないこと。
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // `#[cfg(feature)]` 分岐で const 化できない
     pub fn begin_frame(&mut self) -> bool {
         #[cfg(feature = "filament")]
         {
@@ -91,6 +95,7 @@ impl RenderEngine {
     }
 
     /// フレーム終了。提出 / プレゼントに相当する処理を行う。
+    #[allow(clippy::missing_const_for_fn)]
     pub fn end_frame(&mut self) {
         #[cfg(feature = "filament")]
         {
@@ -102,6 +107,7 @@ impl RenderEngine {
     }
 
     /// スワップチェーンおよびビューポートのリサイズ。
+    #[allow(clippy::missing_const_for_fn)]
     pub fn resize(&mut self, width: u32, height: u32) {
         #[cfg(feature = "filament")]
         {
@@ -142,8 +148,12 @@ impl Drop for RenderEngine {
         {
             // SAFETY: すべて `NonNull` として保持しており、寿命は `RenderEngine` の所有者に一致する。
             //         破棄順は依存関係を考慮して SwapChain -> Renderer -> Engine とする。
-            unsafe { filament_sys::SwapChain_destroy(self.swap_chain.as_ptr()) };
-            unsafe { filament_sys::Renderer_destroy(self.renderer.as_ptr()) };
+            unsafe {
+                filament_sys::SwapChain_destroy(self.engine.as_ptr(), self.swap_chain.as_ptr());
+            }
+            unsafe {
+                filament_sys::Renderer_destroy(self.engine.as_ptr(), self.renderer.as_ptr());
+            }
             unsafe { filament_sys::Engine_destroy(self.engine.as_ptr()) };
         }
     }
