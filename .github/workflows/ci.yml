@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            args: ""
+          - os: ubuntu-latest
+            args: "--no-default-features"
+          - os: windows-latest
+            args: ""
+          - os: windows-latest
+            args: "--no-default-features"
+          - os: macos-latest
+            args: ""
+          - os: macos-latest
+            args: "--no-default-features"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: CI matrix context (failure logs)
+        run: |
+          echo "ci_matrix_os=${{ matrix.os }}"
+          echo "ci_matrix_args=${{ matrix.args }}"
+          echo "ci_rust=$(rustc -vV)"
+
+      - name: Install Linux dependencies (winit / audio / headless display)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libudev-dev libwayland-dev libxkbcommon-dev xvfb
+
+      - run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets ${{ matrix.args }} -- -D warnings
+
+      - name: engine_core feature flags (visibility)
+        run: cargo tree -p engine_core -e features --prefix depth
+
+      - name: "Test: workspace (unit + integration)"
+        run: cargo test --workspace ${{ matrix.args }}
+
+      # ワークスペース経由では依存クレートが engine_core の default を有効化するため、
+      # kira 非リンク（スタブ音声）を別途検証する。
+      - name: "Test: engine_core integration (audio stub, no kira)"
+        if: matrix.args == '--no-default-features'
+        run: cargo test -p engine_core --no-default-features
+
+      # macOS: winit のイベントループはメインスレッド制約があり、libtest 並列時に失敗しうるため 1 スレッドに固定。
+      - name: "Test: smoke (filament_smoke)"
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            export RUST_TEST_THREADS=1
+          fi
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            xvfb-run -a cargo test -p engine_core --features filament --test filament_smoke
+          else
+            cargo test -p engine_core --features filament --test filament_smoke
+          fi

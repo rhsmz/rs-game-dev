@@ -15,7 +15,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 raw-window-handle = "0.6.2"
 winit = "0.30.13"
-kira = "0.12.0"
+kira = { version = "0.12.0", optional = true }
 csv = "1.4.0"
 rand = { workspace = true }
 rand_chacha = { workspace = true }
@@ -28,6 +28,9 @@ workspace = true
 cc = "1"
 
 [features]
+default = ["audio-kira"]
+# 実出力（`cpal` / Linux では ALSA 等がランタイム・ビルドに関与しうる）。
+audio-kira = ["dep:kira"]
 # Filament を有効にする場合だけ、build.rs がリンク設定を行う。
 filament = []
 winit = []
@@ -36,3 +39,7 @@ winit = []
 name = "filament_smoke"
 path = "tests/filament_smoke.rs"
 required-features = ["filament"]
+
+[[test]]
+name = "audio_command_drain"
+path = "tests/audio_command_drain.rs"

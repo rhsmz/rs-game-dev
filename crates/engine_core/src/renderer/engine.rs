@@ -20,6 +20,13 @@ pub struct RenderEngine {
     #[cfg(feature = "filament")]
     swap_chain: NonNull<filament_sys::SwapChain>,
 
+    /// 直近の `resize` に基づくスワップチェーン相当の描画解像度（`View` の投影・ビューポート同期用）。
+    #[cfg(feature = "filament")]
+    framebuffer_width: u32,
+
+    #[cfg(feature = "filament")]
+    framebuffer_height: u32,
+
     // 現時点の雛形では、非 Filament 環境でもコンパイルできるようにダミー領域を持つ。
     #[cfg(not(feature = "filament"))]
     _private: (),
@@ -52,13 +59,16 @@ impl RenderEngine {
             let swap_chain_ptr = unsafe { filament_sys::SwapChain_create(engine.as_ptr()) };
             let swap_chain = NonNull::new(swap_chain_ptr).ok_or_else(|| {
                 // SAFETY: `renderer` と `engine` は生成済みなので、ここで破棄してリークを防ぐ。
-                unsafe { filament_sys::Renderer_destroy(renderer.as_ptr()) };
+                unsafe { filament_sys::Renderer_destroy(engine.as_ptr(), renderer.as_ptr()) };
                 unsafe { filament_sys::Engine_destroy(engine.as_ptr()) };
                 anyhow!("Filament SwapChain_create returned null")
             })?;
 
-            log::trace!("RenderEngine: Engine, Renderer, SwapChain initialized");
-            Ok(Self { engine, renderer, swap_chain })
+            log::debug!(
+                target: "engine_core::renderer",
+                "RenderEngine: Filament Engine, Renderer, SwapChain initialized (resize + viewport to be applied per frame)"
+            );
+            Ok(Self { engine, renderer, swap_chain, framebuffer_width: 4, framebuffer_height: 4 })
         }
 
         #[cfg(not(feature = "filament"))]
@@ -72,6 +82,7 @@ impl RenderEngine {
     ///
     /// `false` のときは描画をスキップし、呼び出し側は `render_system` を呼ばないこと。
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // `#[cfg(feature)]` 分岐で const 化できない
     pub fn begin_frame(&mut self) -> bool {
         #[cfg(feature = "filament")]
         {
@@ -91,6 +102,7 @@ impl RenderEngine {
     }
 
     /// フレーム終了。提出 / プレゼントに相当する処理を行う。
+    #[allow(clippy::missing_const_for_fn)]
     pub fn end_frame(&mut self) {
         #[cfg(feature = "filament")]
         {
@@ -102,9 +114,12 @@ impl RenderEngine {
     }
 
     /// スワップチェーンおよびビューポートのリサイズ。
+    #[allow(clippy::missing_const_for_fn)]
     pub fn resize(&mut self, width: u32, height: u32) {
         #[cfg(feature = "filament")]
         {
+            self.framebuffer_width = width.max(1);
+            self.framebuffer_height = height.max(1);
             // SAFETY: `swap_chain` は `NonNull` かつ `RenderEngine` 寿命内。
             unsafe {
                 filament_sys::SwapChain_resize(self.swap_chain.as_ptr(), width, height);
@@ -134,6 +149,13 @@ impl RenderEngine {
     pub(crate) const fn filament_engine(&self) -> NonNull<filament_sys::Engine> {
         self.engine
     }
+
+    /// `ViewCamera_update_*` へ渡すフレームバッファサイズ（少なくとも 1x1）。
+    #[cfg(feature = "filament")]
+    #[must_use]
+    pub(crate) const fn framebuffer_dimensions(&self) -> (u32, u32) {
+        (self.framebuffer_width, self.framebuffer_height)
+    }
 }
 
 impl Drop for RenderEngine {
@@ -142,8 +164,12 @@ impl Drop for RenderEngine {
         {
             // SAFETY: すべて `NonNull` として保持しており、寿命は `RenderEngine` の所有者に一致する。
             //         破棄順は依存関係を考慮して SwapChain -> Renderer -> Engine とする。
-            unsafe { filament_sys::SwapChain_destroy(self.swap_chain.as_ptr()) };
-            unsafe { filament_sys::Renderer_destroy(self.renderer.as_ptr()) };
+            unsafe {
+                filament_sys::SwapChain_destroy(self.engine.as_ptr(), self.swap_chain.as_ptr());
+            }
+            unsafe {
+                filament_sys::Renderer_destroy(self.engine.as_ptr(), self.renderer.as_ptr());
+            }
             unsafe { filament_sys::Engine_destroy(self.engine.as_ptr()) };
         }
     }

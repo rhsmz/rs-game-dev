@@ -1,0 +1,20 @@
+# 音声デバイス依存の #[ignore] テストを定期実行する（通常 CI はスタブ／キュー検証で担保）。
+name: Audio ignored tests (nightly)
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  kira-ignored:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux audio build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+      - name: Run engine_core ignored audio tests
+        run: cargo test -p engine_core --features audio-kira -- --ignored

@@ -3,7 +3,20 @@
 //! BGM / SE / Voice のミキシングとクロスフェード制御。
 //! 音声 RMS 解析によるリップシンク連携を提供する。
 //!
-//! バックエンド: `kira` or `rodio`
+//! ## バックエンドと feature
+//!
+//! - **既定**: `audio-kira` が有効で [`GameAudioManager`] が `kira`（`cpal`）をリンクする。
+//! - **Linux**: 実行時に ALSA 等が必要になることがある。ヘッドレス CI では `libasound2-dev` を入れるか、
+//!   `cargo test -p engine_core --no-default-features` でスタブマネージャのみを検証する。
+//! - **`--no-default-features`**: `engine_core` 単体では `kira` をリンクせずスタブ [`GameAudioManager`] でビルドする。
+//!   他クレートが `engine_core` に `default-features = true`（既定）のまま依存すると、ワークスペース全体の feature 統合で `audio-kira` が付くことがある。CI では `cargo test -p engine_core --no-default-features` でスタブ経路を検証する。
+//!
+//! ファイルパスが存在しない再生コマンドは **warn ログのうえスキップ**する（I/O 層の仕様）。
+//!
+//! バックエンド切り替えの拡張: `kira` or `rodio`（将来）。
+
+mod error;
+pub use error::AudioLoadError;
 
 mod lip_sync;
 pub use lip_sync::calculate_lip_sync_value;
@@ -17,10 +30,11 @@ mod ecs_integration;
 pub use ecs_integration::{AudioCommand, AudioSource, AudioTrack};
 
 mod command_queue;
-pub use command_queue::AudioCommandQueue;
+pub use command_queue::{AudioCommandQueue, QueuedAudioCommand};
 
+/// `AudioCommand` の適用・FIFO 優先ルール・観測ログの約束は [`command_dispatch`](command_dispatch) を参照。
 mod command_dispatch;
-pub use command_dispatch::audio_command_system;
+pub use command_dispatch::{audio_command_system, drain_audio_command_queue_with};
 
 mod manager;
 pub use manager::GameAudioManager;

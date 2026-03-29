@@ -1,8 +1,39 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-28
-> **ビルド状態**: `cargo test --workspace` 全パス（engine_core は 71 passed / 3 ignored 相当）/ `cargo fmt` OK / `cargo clippy --workspace --all-targets` 警告 0 件
+> **最終更新**: 2026-03-29（Phase 1-alpha: テスト階層・ログキー辞書を `plan/15` に集約、`GEMINI.md` を `.cursor` 正とする修正）
+> **ビルド状態**: `cargo test --workspace` / `cargo test -p engine_core --no-default-features` / `cargo clippy --workspace --all-targets -- -D warnings` をローカルで確認すること
 > **現在ブランチ**: （作業ブランチに依存）
+
+## タスク完了時の記録（DoD）
+
+タスクを完了にチェックする前に、次を埋める（P1 / Phase 2 readiness 向け）。
+
+| 項目 | 記入例 |
+|------|--------|
+| **縦スライス完了**（動く最小経路） | 例: `audio_command_system` + スタブマネージャでキュー drain |
+| **本番要件完了**（デバイス・フィルタ込み） | 例: `kira` + 実出力は nightly `ignored` テスト |
+| **失敗時挙動** | 例: ファイルなしは warn + スキップ（`crates/engine_core/src/audio/mod.rs` のモジュール doc） |
+| **観測方法** | 例: `RUST_LOG=engine_core::audio=trace`、または該当テスト名 |
+| **検証コマンド** | 例: `cargo test -p engine_core --test audio_command_drain` |
+
+関連計画: [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md)
+
+### `#[ignore]` 付きテストの運用
+
+- **タスク完了の唯一の根拠にしない**（デバイス依存・ゴールデン画像未導入など）。必ず上表の **縦スライス** 行でデバイス非依存テストを埋める。
+- 本番要件は **別行**（nightly / 手動）で明示し、PR の「検証証跡」欄にコマンドを残す。
+
+### Phase 1 readiness — 検証コマンド早見表（`engine_core`）
+
+| 領域 | コマンド |
+|------|----------|
+| ワークスペース既定 | `cargo test --workspace` |
+| スタブ音声（kira 非リンク） | `cargo test -p engine_core --no-default-features` |
+| 音声キュー FIFO（デバイス非依存） | `cargo test -p engine_core --test audio_command_drain` |
+| 音声ユニット（FIFO・drop 等） | `cargo test -p engine_core audio::command_dispatch` |
+| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨。macOS はメインスレッド制約のため `RUST_TEST_THREADS=1` を推奨。CI は全行列で実行） |
+| メッシュ縦スライス trace | `ENGINE_CORE_MESH_SUBMIT_TRACE=1` を設定したうえで上記 smoke（`attach_ok` / `skipped_unloaded` をテストが検証） |
+| 音声デバイス依存（ignored） | `cargo test -p engine_core --features audio-kira -- --ignored`（nightly ワークフロー可） |
 
 ## Phase 0: プロジェクト基盤 ✅
 
@@ -71,7 +102,7 @@
 - [x] ウィンドウ作成 + Filament 初期化テスト
 - [x] マルチビュー描画テスト
 
-**Filament サブモジュール / プリビルトの運用タスク**（バージョン整合・FFI・上流追従）は [`third_party/FILAMENT_SUBMODULE_TASKS.md`](third_party/FILAMENT_SUBMODULE_TASKS.md) を参照。
+**Filament サブモジュール / プリビルトの運用タスク**（バージョン整合・FFI・上流追従）は、ルートの `third_party` が **[rhsmz/rs-game-dev-third-party](https://github.com/rhsmz/rs-game-dev-third-party)** のサブモジュールになっているため、初回は `git submodule update --init --recursive` で取得したうえで [`third_party/FILAMENT_SUBMODULE_TASKS.md`](third_party/FILAMENT_SUBMODULE_TASKS.md) を参照する。
 
 ### Audio — サウンドシステム (plan/03)
 
@@ -102,6 +133,110 @@
 - [x] `derive_child_seed` によるシーン遷移時のシード・バケツリレー（親シード + `salt` で子 `LogicSeed` を導出）
 - [x] ECS リソースとして登録（`world.insert_resource` で `LogicRng` / `VisualRng`）
 - [x] 同一シード再現性テスト / 粗い一様分布（ビン頻度）テスト / `World` 登録テスト
+
+---
+
+## Phase 1-alpha review修正
+
+本節は **Phase 1 外部レビュー**（[`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md)）および **追加ソースレビュー**（下記 A / B）から切り出した **継続 WBS** である。`## Phase 2` と並走させず、Readiness ゲートは [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md) の実施ログと照合する。
+
+### エージェント／開発者向け
+
+- **規約の正**: Cursor は [`.cursor/rules/`](.cursor/rules/) の `.mdc` を読み込む。汎用 AI 向けの短い索引は [`GEMINI.md`](GEMINI.md)（旧 `.agent/` は補助・重複あり）。
+- **タスクの真**: レビュー doc の「反映メモ」は経緯用。**現在の完了状態はこの節の `[x]` / `[ ]` と `plan/15` のログ**を正とする。
+- **テスト階層・ログキー**: [`plan/15`](plan/15_phase2_readiness_plan.md) の「テスト階層」「ログキー・代表メッセージ」節（CI ステップ名は [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
+
+以下は **未完了または継続フォロー** を含むチェックリスト（完了分も追跡用に残す）。
+
+### P0（必須）— Renderer 実幾何描画の閉塞（P0-1）
+
+- [x] `renderable_id` → `RenderableManager` 実体への **対応方針・ライフサイクル**を [`renderer/mod.rs` のモジュール doc](crates/engine_core/src/renderer/mod.rs) と [`plan/15`](plan/15_phase2_readiness_plan.md) に記載
+- [x] Filament ブリッジ（`filament_bridge.cpp`）で **`RenderableManager` 実結線**: 既定マテリアル + 三角形、`renderable_id` ごとに 1 エンティティ（`Scene_destroy` で C++ レジストリ解放）。**スタブ**は従来どおり幾何なし
+- [ ] アセットロード連動の **メッシュ／マテリアル 1 対 1 レジストリ**（`renderable_id` を実リソースに解決、デスポーン時の確実な破棄 — Phase 2）
+- [x] 未ロードメッシュ（`renderable_id == 0`）を **warn + skip** に統一
+- [x] カメラ行列（view / proj）反映の最低限の退行防止（`filament_smoke` 内で `resize` → `sync_framebuffer` を挟む）
+- [x] カメラ複数体時の採用ポリシー（ストレージ反復の先頭のみ）を `Camera3D` のモジュール doc に記載
+- [x] 自動テストで **非ゼロメッシュの Scene 投入成功** を保証（`filament_smoke` + `ENGINE_CORE_MESH_SUBMIT_TRACE`）
+- [x] `filament_smoke` で **メッシュ submit 受理・skip カウント** を検証（`take_mesh_submit_trace`）
+- [x] visual golden 導入条件を [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md) に追記
+
+### P0（必須）— Audio 運用の残り（P0-2）
+
+- [x] 欠損・デコード系 warn の **必須キー**を `format_audio_warn_message` の単体テストで検証（ログ本文のグローバル捕捉は引き続き不要）
+
+### P1（推奨）— CI マトリクス（P1-1）
+
+- [x] OS 軸で **macOS** ジョブを追加（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
+- [x] `default` / `--no-default-features` / `--features filament` の **意図したマトリクス**を CI と [`plan/15`](plan/15_phase2_readiness_plan.md) の実施ログで一致（ubuntu / windows / macos それぞれ `args: ""` と `--no-default-features`、filament smoke は全行列）
+- [x] `audio_command_drain` は `cargo test --workspace` に含まれる（`engine_core` の `[[test]]`）
+- [x] `filament_smoke` の **Linux xvfb / macOS 単一スレッド**を CI に明記
+- [x] 失敗ログ向けに **matrix os / args** と `rustc -vV` をジョブ先頭で出力
+
+### P1（推奨）— unsafe レビュー運用（P1-2）
+
+- [x] PR テンプレに **`SAFETY.md` 準拠**と **`// SAFETY:`**・スレッド前提を明記
+- [x] 新規 `unsafe` は **証跡**（理由・前提・境界）と **`// SAFETY:`** を PR レビュー必須条件として明文化（テンプレに記載）
+- [x] 手書き `Send` / `Sync` 実装時は **スレッド制約** を必須記載（テンプレに記載）
+
+### P2（余力）— 可観測性（P2-1）
+
+- [x] Renderer / Audio の **メトリクス名たたき台**を [`plan/15`](plan/15_phase2_readiness_plan.md) 実施ログ（P2-1 節）に記載
+- [ ] 上記カウンタの **実装・出力**（ログ集約または OTel 等）と nightly トレンド・閾値通知の導線
+
+#### A. ゲームエンジンのコアロジック完成度を 10 点にする
+
+- [ ] **A1. Renderer の実ジオメトリ責務を `renderable_id` 依存から脱却**  
+  （現状観測: `MeshRenderer` は `u32` のみ保持、`render_system` は `Scene_submit_mesh_vertical_slice` を呼ぶ縦スライス中心）
+  - [ ] A1-1. `MeshRenderer` に「リソースID」「描画可否状態」「破棄フック」を追加し、ID生値直渡しを廃止
+  - [ ] A1-2. `render_system` でメッシュ提出前に「ロード済み」「scene attach 済み」を明示検証
+  - [ ] A1-3. `GameView` 破棄時に detach/destroy の順序保証テストを追加（再入場時リーク防止）
+
+- [ ] **A2. Camera 仕様の決定性を強化（複数カメラ時）**  
+  （現状観測: `render_system` は storage 先頭カメラを採用）
+  - [ ] A2-1. カメラ選択戦略（priority or active flag）を Component に導入
+  - [ ] A2-2. 同 priority 衝突時の deterministic tie-break（Entity ID 昇順など）を仕様化
+  - [ ] A2-3. 複数カメラ回帰テスト（選択結果・view/proj 反映）を統合テストへ追加
+
+- [ ] **A3. Audio 異常系の仕様を運用レベルまで固定**  
+  （現状観測: warn は整備されているが、drop policy と再試行方針は暗黙）
+  - [ ] A3-1. queue drop の閾値・集約粒度・再通知間隔を定義し docs + テストへ反映
+  - [ ] A3-2. `backend` エラー時の再試行方針（即時/次フレーム/しない）をコマンド別に定義
+  - [ ] A3-3. `PlayVoice(lip_sync=true)` の「未接続」状態を TODO でなく状態遷移として扱う
+
+- [ ] **A4. Input/RNG/ECS の end-to-end 再現性テストを導入**
+  - [ ] A4-1. 1シナリオ統合テスト（入力イベント列→ECS→Audio/Renderer 呼び出し順）を追加
+  - [x] A4-2. `LogicSeed` の派生鎖（親→子→孫）を scene salt と紐づけて固定検証（`crates/engine_core/src/rng/logic.rs` の `test_derive_child_seed_parent_child_grandchild_chain`）
+  - [ ] A4-3. replay 用ログ（frame, input, seed, command seq）の最小フォーマットを策定
+
+- [ ] **A-DoD（10点到達条件）**
+  - [ ] 実メッシュ描画・カメラ選択・音声異常系を CI で再現できる
+  - [ ] 手動確認を要する判定項目を 0 へ削減
+
+#### B. ソースコードをエンタープライズ品質 10 点にする
+
+- [ ] **B1. 境界契約（契約違反時の動作）を API に明示**
+  - [x] B1-1. `render_system` / `audio_command_system` の「前提条件」「失敗時動作」を rustdoc に追記
+  - [ ] B1-2. `#[must_use]` を戻り値契約がある API に追加（抜け漏れ監査を実施）
+  - [ ] B1-3. `panic` 非許容レイヤを定義し、`anyhow` 伝播ポリシーを文書化
+
+- [ ] **B2. テスト戦略を「ユニット中心」から「責務別階層」へ再編**
+  - [x] B2-1. unit / integration / smoke / nightly の分類を `TASKS.MD` と CI 名称で一致（定義は [`plan/15`](plan/15_phase2_readiness_plan.md) の「テスト階層」）
+  - [x] B2-2. `#[ignore]` テストの解除条件（データ・環境・閾値）を各テストdocに記載（`filament_smoke` の visual プレースホルダ等。他は随時 rustdoc 追記）
+  - [ ] B2-3. flaky 監視（過去N回成功率）を nightly artifact に保存
+
+- [ ] **B3. ログとメトリクスの標準化（監視可能性）**
+  - [x] B3-1. `engine_core::renderer` / `engine_core::audio` のログキー辞書を docs 化（[`plan/15`](plan/15_phase2_readiness_plan.md)「ログキー・代表メッセージ」）
+  - [ ] B3-2. frame skip・mesh attach fail・audio drop を共通メトリクス名で定義
+  - [ ] B3-3. CI 失敗時にメトリクスと直近 warn を artifact 化してレビュー時間を短縮
+
+- [ ] **B4. unsafe/FFI 変更の監査可能性を強化**
+  - [ ] B4-1. FFI 呼び出し点ごとに `// SAFETY:` の期待不変条件をテンプレ化
+  - [ ] B4-2. `SAFETY.md` との不一致を検出するレビュー手順（チェックリスト）を運用化
+  - [ ] B4-3. Filament bridge 更新時の互換性確認手順（ABI/関数有無）を定型化
+
+- [ ] **B-DoD（10点到達条件）**
+  - [ ] required checks だけで品質合否を機械判定できる
+  - [ ] FFI/unsafe を含む変更が第三者レビューで再現可能
 
 ---
 

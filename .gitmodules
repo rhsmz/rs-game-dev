@@ -1,5 +1,3 @@
-[submodule "third_party/filament"]
-	path = third_party/filament
-	url = git@github.com:rhsmz/filament-rs-game-dev.git
-	branch = private
-	shallow = true
+[submodule "third_party"]
+	path = third_party
+	url = git@github.com:rhsmz/rs-game-dev-third-party.git

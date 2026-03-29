@@ -4,6 +4,16 @@
 
 本プロジェクトは、Rustのメモリ安全性・並行処理性能を基盤に、Google製の物理ベースレンダラー **Filament** を採用。「**Live2Dによる最高峰の2D表現**」と「**VRMによる次世代3D表現**」を単一のスクリプト環境で制御し、3Dライティングの影響を受ける2D表現や3Dミニゲームとのシームレスな融合を、プログラミング知識のないクリエイター（学生）でも実現できる環境を提供する。
 
+### リポジトリ内ナビ（タスク・規約・AI）
+
+| 用途 | 場所 |
+|------|------|
+| 進行タスク・完了条件（DoD） | [`TASKS.MD`](TASKS.MD) |
+| Phase 2 準備・検証コマンド・テスト階層 | [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md) |
+| Cursor 用ルール（コーディング規約など） | [`.cursor/rules/`](.cursor/rules/) |
+| 汎用 AI 向けの短い索引（Gemini CLI 等） | [`GEMINI.md`](GEMINI.md) |
+| Phase 1-alpha レビュー反映の経緯 | [`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md) |
+
 ---
 
 ## 1.1 開発・CI環境の前提（システム依存ライブラリ）
