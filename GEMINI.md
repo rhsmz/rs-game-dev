@@ -33,20 +33,25 @@
 - **マルチビューレンダリング**: Game View (Layer 0: 3D+Live2D+2D) + UI View (Layer 1: Ortho)
 - **Dual RNG**: 演出用 (Xoshiro256++) とロジック用 (ChaCha8) の分離
 
-## Agent System Structure
-- `.agent/rules/` — Rust コーディング規約、アーキテクチャ規約、アセット規約、クレート構造規約
-- `.agent/workflows/` — ビルド、テスト、リリース、新クレート追加
-- `.agent/skills/` — シーン作成、ミニゲームプラグイン、Live2D/VRM統合、UI開発、セーブシステム
+## 規約・ワークフローの所在（Cursor を正とする）
 
-## Key Rules
-- **コーディング:** `.agent/rules/rust_coding.md` に従う
-- **アーキテクチャ:** `.agent/rules/architecture.md` に従う
-- **アセット管理:** `.agent/rules/asset_convention.md` に従う
-- **クレート構成:** `.agent/rules/crate_structure.md` に従う
+Cursor / Copilot 等は **`.cursor/rules/*.mdc`** をワークスペースルールとして読み込む。本ファイルは **汎用 AI 向けの短い索引**であり、詳細は各ルールファイルを参照すること。
+
+| 種別 | パス（編集の優先順位） |
+|------|-------------------------|
+| ルール | [`.cursor/rules/`](.cursor/rules/)（`rust-coding.mdc`, `architecture.mdc`, `project-context.mdc`, `crate-structure.mdc`, `asset-convention.mdc`） |
+| スキル | [`.cursor/skills/`](.cursor/skills/)（`build_workflow`, `test_workflow`, `git_commit` 等の `SKILL.md`） |
+| 補助 | [`.agent/`](.agent/)（旧来の `rules` / `workflows` / `skills`。**`.cursor` と重複する場合は `.cursor` を正**とし、新規は `.cursor` に集約する） |
+
+## タスク・計画（作業の入口）
+
+- **日々のタスク・DoD**: [`TASKS.MD`](TASKS.MD)（`## Phase 1-alpha review修正` はレビュー由来の継続 WBS）
+- **Phase 2 readiness・検証コマンド**: [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md)
+- **レビュー反映の経緯メモ**: [`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md)
 
 ## General Guidelines
-- Rust のメモリ安全性・借用チェッカーを尊重し `unsafe` を最小限に
-- `clippy` / `rustfmt` を常に適用
+- Rust のメモリ安全性・借用チェッカーを尊重し `unsafe` は FFI 境界に限定（[`SAFETY.md`](SAFETY.md)）
+- `cargo fmt` / `cargo clippy -- -D warnings` を PR 前に通す
 - ECS と UI を直接参照せずメッセージパッシングで連携
 - ミニゲームは `Scene` トレイトを実装した独立プラグインとして追加
 - セーブデータは MessagePack 形式 (`rmp-serde`)
