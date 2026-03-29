@@ -129,8 +129,10 @@ pub fn audio_command_system(world: &mut World) {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
+    #![allow(clippy::expect_used)]
 
     use super::*;
+    use crate::audio::AudioTrack;
     use crate::ecs::world::World;
 
     #[test]
@@ -153,6 +155,23 @@ mod tests {
         let mut world = World::new();
         let mut q = AudioCommandQueue::default();
         q.push(AudioCommand::StopBgm { fade_ms: 0 });
+        world.insert_resource(q);
+
+        audio_command_system(&mut world);
+
+        let q_after = world.get_resource::<AudioCommandQueue>().expect("queue reinserted");
+        assert!(q_after.is_empty());
+    }
+
+    /// P0-3: ECS リソース上のキュー → `audio_command_system` → `GameAudioManager` の縦切り（ローカル検証用）。
+    #[test]
+    #[ignore = "音声デバイス/バックエンドに依存するため、デフォルト実行ではスキップする"]
+    fn test_audio_ecs_set_volume_end_to_end() {
+        let mut world = World::new();
+        let manager = GameAudioManager::new().expect("kira backend");
+        world.insert_resource(manager);
+        let mut q = AudioCommandQueue::default();
+        q.push(AudioCommand::SetVolume { track: AudioTrack::Bgm, volume: 0.42 });
         world.insert_resource(q);
 
         audio_command_system(&mut world);
