@@ -1,4 +1,6 @@
 //! ビュー（Game View / UI View）雛形。
+//!
+//! `unsafe impl Send/Sync` の前提と禁止事項は [`SAFETY.md`](../../SAFETY.md) を参照。
 
 use crate::ecs::component::Component;
 #[cfg(feature = "filament")]
@@ -33,6 +35,9 @@ pub struct GameView {
     pub camera: Camera3D,
 
     #[cfg(feature = "filament")]
+    engine: NonNull<filament_sys::Engine>,
+
+    #[cfg(feature = "filament")]
     view: NonNull<filament_sys::View>,
 
     #[cfg(feature = "filament")]
@@ -44,6 +49,9 @@ pub struct UiView {
     pub camera: CameraOrtho,
 
     #[cfg(feature = "filament")]
+    engine: NonNull<filament_sys::Engine>,
+
+    #[cfg(feature = "filament")]
     view: NonNull<filament_sys::View>,
 
     #[cfg(feature = "filament")]
@@ -53,10 +61,12 @@ pub struct UiView {
 impl GameView {
     /// Game View を初期化する。
     #[allow(clippy::missing_errors_doc)]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(engine: &RenderEngine) -> anyhow::Result<Self> {
         #[cfg(feature = "filament")]
         {
-            let engine_ptr = engine.filament_engine().as_ptr();
+            let engine_nn = engine.filament_engine();
+            let engine_ptr = engine_nn.as_ptr();
 
             // SAFETY: `engine_ptr` は有効な Filament Engine。
             let scene_ptr = unsafe { filament_sys::Scene_create(engine_ptr) };
@@ -65,7 +75,7 @@ impl GameView {
 
             let view_ptr = unsafe { filament_sys::View_create(engine_ptr) };
             let Some(view) = NonNull::new(view_ptr) else {
-                unsafe { filament_sys::Scene_destroy(scene.as_ptr()) };
+                unsafe { filament_sys::Scene_destroy(engine_ptr, scene.as_ptr()) };
                 return Err(anyhow!("Filament View_create returned null"));
             };
 
@@ -75,6 +85,7 @@ impl GameView {
 
             Ok(Self {
                 camera: Camera3D { fov: 60.0_f32.to_radians(), near: 0.1, far: 1000.0 },
+                engine: engine_nn,
                 view,
                 scene,
             })
@@ -112,8 +123,8 @@ impl Drop for GameView {
         {
             // SAFETY: `View` を先に破棄し、その後 `Scene` を破棄する。
             unsafe {
-                filament_sys::View_destroy(self.view.as_ptr());
-                filament_sys::Scene_destroy(self.scene.as_ptr());
+                filament_sys::View_destroy(self.engine.as_ptr(), self.view.as_ptr());
+                filament_sys::Scene_destroy(self.engine.as_ptr(), self.scene.as_ptr());
             }
         }
     }
@@ -122,10 +133,12 @@ impl Drop for GameView {
 impl UiView {
     /// UI View を初期化する。
     #[allow(clippy::missing_errors_doc)]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(engine: &RenderEngine) -> anyhow::Result<Self> {
         #[cfg(feature = "filament")]
         {
-            let engine_ptr = engine.filament_engine().as_ptr();
+            let engine_nn = engine.filament_engine();
+            let engine_ptr = engine_nn.as_ptr();
 
             let scene_ptr = unsafe { filament_sys::Scene_create(engine_ptr) };
             let scene = NonNull::new(scene_ptr)
@@ -133,7 +146,7 @@ impl UiView {
 
             let view_ptr = unsafe { filament_sys::View_create(engine_ptr) };
             let Some(view) = NonNull::new(view_ptr) else {
-                unsafe { filament_sys::Scene_destroy(scene.as_ptr()) };
+                unsafe { filament_sys::Scene_destroy(engine_ptr, scene.as_ptr()) };
                 return Err(anyhow!("Filament View_create returned null"));
             };
 
@@ -142,7 +155,7 @@ impl UiView {
             }
 
             // オルソ投影・深度無効は後続で Filament API に接続する（現状はメタデータのみ保持）。
-            Ok(Self { camera: CameraOrtho { near: 0.0, far: 1.0 }, view, scene })
+            Ok(Self { camera: CameraOrtho { near: 0.0, far: 1.0 }, engine: engine_nn, view, scene })
         }
 
         #[cfg(not(feature = "filament"))]
@@ -164,8 +177,8 @@ impl Drop for UiView {
         #[cfg(feature = "filament")]
         {
             unsafe {
-                filament_sys::View_destroy(self.view.as_ptr());
-                filament_sys::Scene_destroy(self.scene.as_ptr());
+                filament_sys::View_destroy(self.engine.as_ptr(), self.view.as_ptr());
+                filament_sys::Scene_destroy(self.engine.as_ptr(), self.scene.as_ptr());
             }
         }
     }
