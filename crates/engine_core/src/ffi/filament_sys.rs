@@ -106,8 +106,9 @@ unsafe extern "C" {
 
     /// Game `Scene` へメッシュ縦スライスを投入する（`renderable_id == 0` は未ロード扱いで `false`）。
     ///
-    /// スタブは幾何を生成せず成否のみ返す。`filament_bridge.cpp` では当面同様に true を返し、
-    /// 実 `RenderableManager` 結線は後続タスクで置き換える。
+    /// 開発スタブ（`filament_stub.c`）は幾何を作らず `true` を返す。
+    /// `filament_bridge.cpp`（`FILAMENT_LIB_DIR` リンク時）は `RenderableManager` で三角形を生成し
+    /// `Scene` に追加する（同一 `scene` + `renderable_id` は初回のみ作成。`Scene_destroy` で解放）。
     pub(crate) fn Scene_submit_mesh_vertical_slice(
         engine: *mut Engine,
         scene: *mut Scene,

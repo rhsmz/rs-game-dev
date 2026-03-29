@@ -3,18 +3,30 @@
 // FILAMENT_LIB_DIR からの相対パスで解決する（build.rs 参照）。
 
 #include <cstdint>
+#include <mutex>
 #include <new>
+#include <unordered_map>
 
+#include <filament/Box.h>
 #include <filament/Camera.h>
 #include <filament/Engine.h>
+#include <filament/IndexBuffer.h>
+#include <filament/Material.h>
+#include <filament/MaterialInstance.h>
+#include <filament/RenderableManager.h>
 #include <filament/Renderer.h>
 #include <filament/Scene.h>
 #include <filament/SwapChain.h>
+#include <filament/VertexBuffer.h>
 #include <filament/View.h>
 #include <filament/Viewport.h>
+
+#include <math/vec3.h>
+
 #include <utils/EntityManager.h>
 
 using namespace filament;
+using filament::math::float3;
 
 namespace {
 
@@ -43,6 +55,123 @@ void apply_ui_view_surface_state(View *view) {
     view->setScreenSpaceRefractionEnabled(false);
 }
 
+/// P0-1: `renderable_id` ごとに 1 エンティティ（三角形 + Engine 既定マテリアル）を Scene に載せる。
+/// `Scene_submit_mesh_vertical_slice` はフレーム毎に呼ばれるため、既登録 ID は no-op。
+struct VerticalSliceMeshRecord {
+    utils::Entity entity{};
+    VertexBuffer *vb = nullptr;
+    IndexBuffer *ib = nullptr;
+};
+
+using VerticalSliceMeshTable = std::unordered_map<uint32_t, VerticalSliceMeshRecord>;
+
+std::mutex g_vertical_slice_mutex;
+std::unordered_map<Scene *, VerticalSliceMeshTable> g_vertical_slice_registry;
+
+/// カメラ前方（-Z）に置いた CCW 三角形。`Engine::getDefaultMaterial()`（内部 unlit グレー）で描画する。
+static const float3 kVerticalSliceTriangle[3] = {
+    {0.0f, 0.55f, -3.5f},
+    {-0.55f, -0.45f, -3.5f},
+    {0.55f, -0.45f, -3.5f},
+};
+
+static constexpr uint16_t kVerticalSliceIndices[3] = {0, 1, 2};
+
+void vertical_slice_destroy_scene_entries(Engine *engine, Scene *scene) {
+    if (engine == nullptr || scene == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_vertical_slice_mutex);
+    auto it = g_vertical_slice_registry.find(scene);
+    if (it == g_vertical_slice_registry.end()) {
+        return;
+    }
+    for (auto &kv : it->second) {
+        VerticalSliceMeshRecord &rec = kv.second;
+        if (!rec.entity.isNull()) {
+            engine->destroy(rec.entity);
+        }
+        if (rec.vb != nullptr) {
+            engine->destroy(rec.vb);
+        }
+        if (rec.ib != nullptr) {
+            engine->destroy(rec.ib);
+        }
+    }
+    g_vertical_slice_registry.erase(it);
+}
+
+bool vertical_slice_create_mesh_for_id(Engine *engine, Scene *scene, uint32_t renderable_id) {
+    std::lock_guard<std::mutex> lock(g_vertical_slice_mutex);
+    VerticalSliceMeshTable &table = g_vertical_slice_registry[scene];
+    if (table.find(renderable_id) != table.end()) {
+        return true;
+    }
+
+    VertexBuffer *vb = VertexBuffer::Builder()
+                               .vertexCount(3)
+                               .bufferCount(1)
+                               .attribute(VertexAttribute::POSITION, 0, VertexBuffer::AttributeType::FLOAT3, 0,
+                                       12)
+                               .build(*engine);
+    if (vb == nullptr) {
+        return false;
+    }
+    vb->setBufferAt(*engine, 0,
+            VertexBuffer::BufferDescriptor(kVerticalSliceTriangle, sizeof(kVerticalSliceTriangle), nullptr));
+
+    IndexBuffer *ib = IndexBuffer::Builder()
+                              .indexCount(3)
+                              .bufferType(IndexBuffer::IndexType::USHORT)
+                              .build(*engine);
+    if (ib == nullptr) {
+        engine->destroy(vb);
+        return false;
+    }
+    ib->setBuffer(*engine, IndexBuffer::BufferDescriptor(kVerticalSliceIndices, sizeof(kVerticalSliceIndices), nullptr));
+
+    Material const *defMat = engine->getDefaultMaterial();
+    if (defMat == nullptr) {
+        engine->destroy(ib);
+        engine->destroy(vb);
+        return false;
+    }
+    MaterialInstance const *mi = defMat->getDefaultInstance();
+
+    utils::Entity renderable = utils::EntityManager::get().create();
+    if (renderable.isNull()) {
+        engine->destroy(ib);
+        engine->destroy(vb);
+        return false;
+    }
+
+    Box bbox{};
+    bbox.set(float3{-0.6f, -0.6f, -4.0f}, float3{0.6f, 0.6f, -3.0f});
+
+    RenderableManager::Builder builder(1);
+    builder.boundingBox(bbox)
+            .material(0, mi)
+            .geometry(0, RenderableManager::PrimitiveType::TRIANGLES, vb, ib, 0, 3)
+            .culling(false)
+            .receiveShadows(false)
+            .castShadows(false);
+    if (builder.build(*engine, renderable) != RenderableManager::Builder::Success) {
+        engine->destroy(renderable);
+        engine->destroy(ib);
+        engine->destroy(vb);
+        return false;
+    }
+
+    scene->addEntity(renderable);
+
+    VerticalSliceMeshRecord rec;
+    rec.entity = renderable;
+    rec.vb = vb;
+    rec.ib = ib;
+    table.emplace(renderable_id, rec);
+    return true;
+}
+
 } // namespace
 
 extern "C" {
@@ -65,6 +194,7 @@ Scene *Scene_create(Engine *engine) {
 }
 
 void Scene_destroy(Engine *engine, Scene *scene) {
+    vertical_slice_destroy_scene_entries(engine, scene);
     if (engine != nullptr && scene != nullptr) {
         (void)engine->destroy(scene);
     }
@@ -145,11 +275,7 @@ bool Scene_submit_mesh_vertical_slice(Engine *engine, Scene *scene, uint32_t ren
     if (engine == nullptr || scene == nullptr || renderable_id == 0u) {
         return false;
     }
-    // TODO(P0-1): RenderableManager + VertexBuffer / Material で実メッシュを Scene に追加する。
-    // 現状は縦スライスとして「非ゼロ ID の投入要求が受理された」ことを返す。
-    (void)engine;
-    (void)scene;
-    return true;
+    return vertical_slice_create_mesh_for_id(engine, scene, renderable_id);
 }
 
 void *ViewCamera_create_game(Engine *engine, View *view, unsigned int width, unsigned int height,
