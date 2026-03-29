@@ -2,6 +2,7 @@
 // ヘッダはプリビルト / 自前インストールの include を FILAMENT_INCLUDE_DIR または
 // FILAMENT_LIB_DIR からの相対パスで解決する（build.rs 参照）。
 
+#include <cstdint>
 #include <new>
 
 #include <filament/Camera.h>
@@ -138,6 +139,17 @@ void Renderer_render(Renderer *renderer, View *view) {
     if (renderer != nullptr && view != nullptr) {
         renderer->render(view);
     }
+}
+
+bool Scene_submit_mesh_vertical_slice(Engine *engine, Scene *scene, uint32_t renderable_id) {
+    if (engine == nullptr || scene == nullptr || renderable_id == 0u) {
+        return false;
+    }
+    // TODO(P0-1): RenderableManager + VertexBuffer / Material で実メッシュを Scene に追加する。
+    // 現状は縦スライスとして「非ゼロ ID の投入要求が受理された」ことを返す。
+    (void)engine;
+    (void)scene;
+    return true;
 }
 
 void *ViewCamera_create_game(Engine *engine, View *view, unsigned int width, unsigned int height,

@@ -31,3 +31,8 @@ pub use render_system::render_system;
 mod render_trace;
 #[cfg(feature = "filament")]
 pub use render_trace::{reset_render_pass_trace, take_render_pass_trace};
+
+#[cfg(feature = "filament")]
+mod mesh_submit_trace;
+#[cfg(feature = "filament")]
+pub use mesh_submit_trace::{reset_mesh_submit_trace, take_mesh_submit_trace};

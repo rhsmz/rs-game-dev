@@ -40,6 +40,10 @@ Turn the current pre-Phase-2 findings into an executable plan that closes critic
 #### Definition of Done
 - One test verifies clear + basic mesh draw + UI overlay in a single frame.
 
+#### Visual golden / pixel tests（導入条件メモ）
+- **ゴールデン画像**比較を CI に載せる前に次を満たすこと: 固定解像度のオフスクリーン RT、プラットフォーム間の許容誤差（SSAA / トーンマップ差）、参照画像の保管場所と更新手順。
+- 現状の `filament_smoke` はパス順・メッシュ縦スライス受理・リサイズ同期の**自動検証**まで。Game/UI 重畳のピクセル一致は [`crates/engine_core/tests/filament_smoke.rs`](../crates/engine_core/tests/filament_smoke.rs) の `#[ignore]` プレースホルダがハーネス接続後に有効化する。
+
 ---
 
 ### P0-2. De-stub public APIs that currently return `not implemented`

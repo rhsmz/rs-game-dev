@@ -14,6 +14,10 @@ use anyhow::anyhow;
 use std::ptr::NonNull;
 
 /// 3D 視点用カメラ情報。
+///
+/// # 複数 `Camera3D` が存在するとき
+/// [`crate::renderer::render_system`] は **ストレージの反復順で最初の 1 体**のみを
+/// 透視投影の基準として用いる（`ComponentStorage` の dense 順＝概ね投入順）。優先度フィールドは未実装。
 #[derive(Debug, Clone, Copy)]
 pub struct Camera3D {
     pub fov: f32,
@@ -172,6 +176,13 @@ impl GameView {
     #[must_use]
     pub(crate) const fn filament_view_ptr(&self) -> NonNull<filament_sys::View> {
         self.view
+    }
+
+    /// Game View の `Scene`（ECS メッシュ投入先）。
+    #[cfg(feature = "filament")]
+    #[must_use]
+    pub(crate) const fn filament_scene_ptr(&self) -> NonNull<filament_sys::Scene> {
+        self.scene
     }
 }
 

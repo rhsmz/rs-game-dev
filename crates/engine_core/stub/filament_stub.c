@@ -6,6 +6,7 @@
  * - GPU や Filament ランタイムに依存しないため、`cargo test`（デバッグ）を常に通しやすくする。
  */
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct Engine Engine;
@@ -87,6 +88,15 @@ void SwapChain_resize(SwapChain *swap_chain, unsigned int width, unsigned int he
 void Renderer_render(Renderer *renderer, View *view) {
     (void)renderer;
     (void)view;
+}
+
+bool Scene_submit_mesh_vertical_slice(Engine *engine, Scene *scene, uint32_t renderable_id) {
+    (void)engine;
+    (void)scene;
+    if (engine == NULL || scene == NULL || renderable_id == 0u) {
+        return false;
+    }
+    return true;
 }
 
 void *ViewCamera_create_game(Engine *engine, View *view, unsigned int width, unsigned int height,

@@ -104,6 +104,16 @@ unsafe extern "C" {
     /// `renderer->render(view)` に相当。
     pub(crate) fn Renderer_render(renderer: *mut Renderer, view: *mut View);
 
+    /// Game `Scene` へメッシュ縦スライスを投入する（`renderable_id == 0` は未ロード扱いで `false`）。
+    ///
+    /// スタブは幾何を生成せず成否のみ返す。`filament_bridge.cpp` では当面同様に true を返し、
+    /// 実 `RenderableManager` 結線は後続タスクで置き換える。
+    pub(crate) fn Scene_submit_mesh_vertical_slice(
+        engine: *mut Engine,
+        scene: *mut Scene,
+        renderable_id: u32,
+    ) -> bool;
+
     /// Game View 用透視カメラを生成し `View` に関連付ける。
     pub(crate) fn ViewCamera_create_game(
         engine: *mut Engine,

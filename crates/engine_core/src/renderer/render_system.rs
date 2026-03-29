@@ -6,14 +6,20 @@ use crate::renderer::{GameView, RenderEngine, UiView};
 #[cfg(feature = "filament")]
 use crate::ecs::component::ComponentStorage;
 #[cfg(feature = "filament")]
+use crate::ecs::entity::Entity;
+#[cfg(feature = "filament")]
+use crate::ffi::filament_sys;
+#[cfg(feature = "filament")]
+use crate::renderer::mesh_submit_trace;
+#[cfg(feature = "filament")]
 use crate::renderer::render_trace;
 #[cfg(feature = "filament")]
 use crate::renderer::{Camera3D, MeshRenderer};
 
 /// レンダリング処理。
 ///
-/// `MeshRenderer` / `Camera3D` を走査し、将来的に Filament へメッシュを投入する。
-/// 現状は **Game View → UI View** の順で `Renderer_render` を呼ぶ（マルチビュー順序の検証用）。
+/// `MeshRenderer` / `Camera3D` を走査し、Game View の `Scene` へ Filament 縦スライス投入を行う。
+/// **Game View → UI View** の順で `Renderer_render` を呼ぶ。
 ///
 /// # 呼び出し契約
 /// - [`RenderEngine::begin_frame`] が `true` を返したフレームでのみ呼ぶこと。
@@ -41,16 +47,36 @@ pub fn render_system(
                 target: "engine_core::renderer",
                 "render_system: no Camera3D entities; skipping mesh submission (views still rendered)"
             );
-        } else if mesh_count > 0 {
-            log::info!(
-                target: "engine_core::renderer",
-                "render_system: vertical_slice frame — mesh_entities={mesh_count} camera_entities={cam_count} (Filament geometry binding is Phase 2+; GameView then UiView render order enforced)"
-            );
         } else {
-            log::trace!(
-                target: "engine_core::renderer",
-                "render_system: mesh_entities=0 camera_entities={cam_count}"
-            );
+            if cam_count > 1 {
+                let first_cam =
+                    world.get_storage::<Camera3D>().and_then(|s| s.iter().next()).map(|(e, _)| e);
+                log::debug!(
+                    target: "engine_core::renderer",
+                    "render_system: {cam_count} Camera3D entities; using first in storage order only (entity={first_cam:?})"
+                );
+            }
+
+            let engine_ptr = engine.filament_engine().as_ptr();
+            let scene_ptr = game.filament_scene_ptr().as_ptr();
+
+            if let Some(mesh_storage) = world.get_storage::<MeshRenderer>() {
+                for (entity, mesh) in mesh_storage.iter() {
+                    submit_one_mesh(entity, engine_ptr, scene_ptr, mesh);
+                }
+            }
+
+            if mesh_count > 0 {
+                log::info!(
+                    target: "engine_core::renderer",
+                    "render_system: vertical_slice frame — mesh_entities={mesh_count} camera_entities={cam_count} (GameView scene submit + GameView then UiView render order)"
+                );
+            } else {
+                log::trace!(
+                    target: "engine_core::renderer",
+                    "render_system: mesh_entities=0 camera_entities={cam_count}"
+                );
+            }
         }
 
         // P0-1: Game View を先に、UI View を後に描画（アーキテクチャの Z オーダー方針に一致）。
@@ -63,5 +89,35 @@ pub fn render_system(
     #[cfg(not(feature = "filament"))]
     {
         let _ = (world, engine, game, ui);
+    }
+}
+
+#[cfg(feature = "filament")]
+fn submit_one_mesh(
+    entity: Entity,
+    engine_ptr: *mut filament_sys::Engine,
+    scene_ptr: *mut filament_sys::Scene,
+    mesh: &MeshRenderer,
+) {
+    if mesh.renderable_id == 0 {
+        mesh_submit_trace::record_skipped_unloaded_mesh();
+        log::warn!(
+            target: "engine_core::renderer",
+            "mesh submit skipped: renderable_id=0 (unloaded); entity={entity}",
+        );
+        return;
+    }
+
+    // SAFETY: `engine_ptr` / `scene_ptr` は `RenderEngine` / `GameView` の寿命内で有効。
+    let ok = unsafe {
+        filament_sys::Scene_submit_mesh_vertical_slice(engine_ptr, scene_ptr, mesh.renderable_id)
+    };
+    mesh_submit_trace::record_attach_result(ok);
+    if !ok {
+        log::warn!(
+            target: "engine_core::renderer",
+            "mesh submit failed: renderable_id={} entity={entity}",
+            mesh.renderable_id,
+        );
     }
 }

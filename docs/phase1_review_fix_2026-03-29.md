@@ -208,3 +208,11 @@
 - **Audio P0-2**: `command_dispatch` に FIFO 優先ルール・必須ログキー（`seq` / `source` / `op` / `err_kind`）の明文化、`StopBgm` / `SetVolume` / `PlayVoice` trace の `op=` 統一、マネージャ不在時 **16 件以上** ドロップで bulk warn、境界テスト（`test_fifo_*` / `test_audio_command_system_drops_bulk_without_manager`）。
 - **DoD P0-3**: PR テンプレに「検証証跡」表、`TASKS.MD` に `#[ignore]` 運用ルールと検証コマンド早見表、`plan/15` に検証コマンド表と P0-3 ログ追記。
 - **CI 可視化**: `cargo tree -p engine_core -e features --prefix depth` を各行列で実行。
+
+### 追記（2026-03-29 以降・P0-1 / P1 フォロー）
+
+- **Renderer P0-1（縦スライス）**: `Scene_submit_mesh_vertical_slice`（スタブ＋`filament_bridge.cpp` のプレースホルダ）を追加し、`render_system` が Game `Scene` に対して `MeshRenderer` を走査投入。`renderable_id==0` は warn + skip。`ENGINE_CORE_MESH_SUBMIT_TRACE` と `take_mesh_submit_trace` で smoke が受理回数を検証。`RenderableManager` 実結線はブリッジ TODO。
+- **Audio P0-2 残**: `format_audio_warn_message` の単体テストで必須ログキーを検証（`#[cfg(any(test, feature = "audio-kira"))]` で no-default-features の dead_code を回避）。
+- **CI P1-1**: `macos-latest` 行列を追加、ジョブ先頭で OS / args / `rustc -vV` を出力。Filament smoke は macOS で `RUST_TEST_THREADS=1`。
+- **PR P1-2**: `pull_request_template.md` に `SAFETY.md` / `// SAFETY:` / 手書き `Send`/`Sync` の明示項目を追加。
+- **計画 doc**: `plan/15_phase2_readiness_plan.md` に visual golden 導入条件を追記。

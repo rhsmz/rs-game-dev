@@ -8,14 +8,19 @@
 //!
 //! ## Phase 2 readiness（P0-1）との対応
 //! - 1 フレーム: `begin_frame` → `render_system`（GameView → UiView の順）→ `end_frame`
-//! - スワップチェーンリサイズ: ウィンドウの `inner_size` を `RenderEngine::resize` に渡す
+//! - スワップチェーンリサイズ: ウィンドウの `inner_size` を `RenderEngine::resize` に渡す（テストでは追加で解像度変更を挟み投影同期の退行を防ぐ）
 //! - `ENGINE_CORE_RENDER_TRACE=1` 時は描画パス順（game_view → ui_view）をバッファに記録し、テストで検証する
-//! - ECS: `Camera3D` + `MeshRenderer` を投入し、メッシュ幾何の Filament バインドは Phase 2 以降（現状はビュー描画とログで縦切りを検証）
+//! - `ENGINE_CORE_MESH_SUBMIT_TRACE=1` 時は Game `Scene` へのメッシュ縦スライス投入（非ゼロ `renderable_id` の受理回数と `id==0` スキップ）をカウントする
+//! - ECS: `Camera3D` + `MeshRenderer`（`renderable_id` 非ゼロと 0 の混在）で投入経路を検証。実ジオメトリの `RenderableManager` 結線はブリッジ TODO で置換予定
+//!
+//! ## Visual golden / ピクセル一致（将来）
+//! - ゴールデン画像ハーネス（プラットフォーム固定解像度・許容誤差・オフスクリーン RT）を導入してから [`test_game_ui_overlap_visual_regression_placeholder`] を有効化する。
+//! - 採用条件の詳細は [`plan/15_phase2_readiness_plan.md`](../../plan/15_phase2_readiness_plan.md) の Renderer DoD / visual 節を参照。
 
 use engine_core::ecs::world::World;
 use engine_core::renderer::{
-    Camera3D, GameView, MeshRenderer, RenderEngine, UiView, render_system, reset_render_pass_trace,
-    take_render_pass_trace,
+    Camera3D, GameView, MeshRenderer, RenderEngine, UiView, render_system, reset_mesh_submit_trace,
+    reset_render_pass_trace, take_mesh_submit_trace, take_render_pass_trace,
 };
 use raw_window_handle::HasWindowHandle;
 use winit::application::ApplicationHandler;
@@ -41,14 +46,27 @@ impl ApplicationHandler for FilamentOneFrameApp {
             let mut game_view = GameView::new(&engine)?;
             let mut ui_view = UiView::new(&engine)?;
 
+            // リサイズ後の view/proj 同期が破綻しないことの最低限の退行防止（P0-1）。
+            engine
+                .resize(size.width.saturating_mul(2).max(8), size.height.saturating_mul(2).max(8));
+            game_view.sync_framebuffer_from_engine(&engine);
+            ui_view.sync_framebuffer_from_engine(&engine);
+            engine.resize(size.width.max(1), size.height.max(1));
+            game_view.sync_framebuffer_from_engine(&engine);
+            ui_view.sync_framebuffer_from_engine(&engine);
+
             let mut world = World::new();
             let cam = world.spawn();
             world.insert_component(
                 cam,
                 Camera3D { fov: 60.0_f32.to_radians(), near: 0.1, far: 100.0 },
             );
-            let mesh = world.spawn();
-            world.insert_component(mesh, MeshRenderer { renderable_id: 1 });
+            let mesh_loaded = world.spawn();
+            world.insert_component(mesh_loaded, MeshRenderer { renderable_id: 1 });
+            let mesh_unloaded = world.spawn();
+            world.insert_component(mesh_unloaded, MeshRenderer { renderable_id: 0 });
+            let mesh_loaded_b = world.spawn();
+            world.insert_component(mesh_loaded_b, MeshRenderer { renderable_id: 2 });
 
             assert!(engine.begin_frame(), "begin_frame must succeed (dev stub or real Filament)");
             render_system(&world, &mut engine, &mut game_view, &mut ui_view);
@@ -81,16 +99,20 @@ fn build_event_loop() -> anyhow::Result<EventLoop<()>> {
 #[test]
 fn test_filament_one_frame_vertical_slice() -> anyhow::Result<()> {
     reset_render_pass_trace();
-    // SAFETY: テストは単一スレッドで、他コードと `ENGINE_CORE_RENDER_TRACE` を共有しない。
+    reset_mesh_submit_trace();
+    // SAFETY: テストは単一スレッドで、他コードとトレース用 env を共有しない。
     unsafe {
         std::env::set_var("ENGINE_CORE_RENDER_TRACE", "1");
+        std::env::set_var("ENGINE_CORE_MESH_SUBMIT_TRACE", "1");
     }
     let event_loop = build_event_loop()?;
     let mut app = FilamentOneFrameApp { window: None, test_result: Ok(()) };
     event_loop.run_app(&mut app)?;
     let trace = take_render_pass_trace();
+    let (skipped_unloaded, attach_ok, attach_fail) = take_mesh_submit_trace();
     unsafe {
         std::env::remove_var("ENGINE_CORE_RENDER_TRACE");
+        std::env::remove_var("ENGINE_CORE_MESH_SUBMIT_TRACE");
     }
     app.test_result?;
     assert_eq!(
@@ -98,6 +120,12 @@ fn test_filament_one_frame_vertical_slice() -> anyhow::Result<()> {
         vec!["game_view".to_string(), "ui_view".to_string()],
         "GameView を先に、UiView を後に `Renderer_render` する（P0-1 描画順保証）"
     );
+    assert_eq!(
+        skipped_unloaded, 1,
+        "renderable_id=0 のメッシュは warn+skip され、トレースで 1 回カウントされる"
+    );
+    assert_eq!(attach_ok, 2, "非ゼロ renderable_id は Scene 縦スライスとして 2 回受理される");
+    assert_eq!(attach_fail, 0, "スタブ/ブリッジは現状非ゼロ ID で失敗しない");
     Ok(())
 }
 

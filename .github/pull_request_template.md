@@ -21,5 +21,7 @@
 ## Unsafe / FFI（該当時のみ）
 
 - 触ったファイル:
-- `// SAFETY:` コメントとスレッド前提:
+- [`crates/engine_core/SAFETY.md`](../crates/engine_core/SAFETY.md) のチェックリストを確認した（`unsafe` / 手書き `Send`/`Sync` / FFI 境界）
+- 新規・変更した `unsafe` ブロックはいずれも **`// SAFETY:`** で前提・不変条件を説明している
+- 手書き `unsafe impl Send` / `Sync` がある場合、**どのスレッドから触ってよいか**をコメントまたは SAFETY に書いた
 - 新規 `unsafe impl Send/Sync` の有無と根拠:

@@ -1,6 +1,6 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-29
+> **最終更新**: 2026-03-29（Phase 1-alpha review 残タスクを同ファイルに切り出し）
 > **ビルド状態**: `cargo test --workspace` / `cargo test -p engine_core --no-default-features` / `cargo clippy --workspace --all-targets -- -D warnings` をローカルで確認すること
 > **現在ブランチ**: （作業ブランチに依存）
 
@@ -31,7 +31,8 @@
 | スタブ音声（kira 非リンク） | `cargo test -p engine_core --no-default-features` |
 | 音声キュー FIFO（デバイス非依存） | `cargo test -p engine_core --test audio_command_drain` |
 | 音声ユニット（FIFO・drop 等） | `cargo test -p engine_core audio::command_dispatch` |
-| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨） |
+| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨。macOS はメインスレッド制約のため `RUST_TEST_THREADS=1` を推奨） |
+| メッシュ縦スライス trace | `ENGINE_CORE_MESH_SUBMIT_TRACE=1` を設定したうえで上記 smoke（`attach_ok` / `skipped_unloaded` をテストが検証） |
 | 音声デバイス依存（ignored） | `cargo test -p engine_core --features audio-kira -- --ignored`（nightly ワークフロー可） |
 
 ## Phase 0: プロジェクト基盤 ✅
@@ -132,6 +133,47 @@
 - [x] `derive_child_seed` によるシーン遷移時のシード・バケツリレー（親シード + `salt` で子 `LogicSeed` を導出）
 - [x] ECS リソースとして登録（`world.insert_resource` で `LogicRng` / `VisualRng`）
 - [x] 同一シード再現性テスト / 粗い一様分布（ビン頻度）テスト / `World` 登録テスト
+
+---
+
+## Phase 1-alpha review修正
+
+> 出典: [`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md)  
+> **反映済み（同 doc「反映メモ」）**: P0-2（Audio 運用の一部）/ P0-3（DoD・証跡）/ P1-1（`cargo tree -e features` 可視化）。  
+> 以下は **未完了または継続フォロー** のみを切り出したチェックリスト。
+
+### P0（必須）— Renderer 実幾何描画の閉塞（P0-1）
+
+- [ ] `MeshRenderer` の `renderable_id` と Filament **`RenderableManager` 実体**の対応表（現状は縦スライス FFI のみ・ブリッジ TODO）
+- [x] 未ロードメッシュ（`renderable_id == 0`）を **warn + skip** に統一
+- [x] カメラ行列（view / proj）反映の最低限の退行防止（`filament_smoke` 内で `resize` → `sync_framebuffer` を挟む）
+- [x] カメラ複数体時の採用ポリシー（ストレージ反復の先頭のみ）を `Camera3D` のモジュール doc に記載
+- [x] 自動テストで **非ゼロメッシュの Scene 投入成功** を保証（`filament_smoke` + `ENGINE_CORE_MESH_SUBMIT_TRACE`）
+- [x] `filament_smoke` で **メッシュ submit 受理・skip カウント** を検証（`take_mesh_submit_trace`）
+- [x] visual golden 導入条件を [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md) に追記
+
+### P0（必須）— Audio 運用の残り（P0-2）
+
+- [x] 欠損・デコード系 warn の **必須キー**を `format_audio_warn_message` の単体テストで検証（ログ本文のグローバル捕捉は引き続き不要）
+
+### P1（推奨）— CI マトリクス（P1-1）
+
+- [x] OS 軸で **macOS** ジョブを追加（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
+- [ ] `default` / `--no-default-features` / `--features filament` の **意図したマトリクス**を CI と doc で一致（Windows での `no-default` 等、残ギャップがあれば潰す）
+- [x] `audio_command_drain` は `cargo test --workspace` に含まれる（`engine_core` の `[[test]]`）
+- [x] `filament_smoke` の **Linux xvfb / macOS 単一スレッド**を CI に明記
+- [x] 失敗ログ向けに **matrix os / args** と `rustc -vV` をジョブ先頭で出力
+
+### P1（推奨）— unsafe レビュー運用（P1-2）
+
+- [x] PR テンプレに **`SAFETY.md` 準拠**と **`// SAFETY:`**・スレッド前提を明記
+- [x] 新規 `unsafe` は **証跡**（理由・前提・境界）と **`// SAFETY:`** を PR レビュー必須条件として明文化（テンプレに記載）
+- [x] 手書き `Send` / `Sync` 実装時は **スレッド制約** を必須記載（テンプレに記載）
+
+### P2（余力）— 可観測性（P2-1）
+
+- [ ] Renderer / Audio の定点メトリクス設計（frame skip 率・audio drop 率など）
+- [ ] nightly 等での回帰トレンド監視・閾値超過通知の導線
 
 ---
 

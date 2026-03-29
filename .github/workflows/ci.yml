@@ -20,6 +20,8 @@ jobs:
             args: "--no-default-features"
           - os: windows-latest
             args: ""
+          - os: macos-latest
+            args: ""
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +29,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: CI matrix context (failure logs)
+        run: |
+          echo "ci_matrix_os=${{ matrix.os }}"
+          echo "ci_matrix_args=${{ matrix.args }}"
+          echo "ci_rust=$(rustc -vV)"
 
       - name: Install Linux dependencies (winit / audio / headless display)
         if: runner.os == 'Linux'
@@ -51,9 +59,13 @@ jobs:
         if: matrix.args == '--no-default-features'
         run: cargo test -p engine_core --no-default-features
 
+      # macOS: winit のイベントループはメインスレッド制約があり、libtest 並列時に失敗しうるため 1 スレッドに固定。
       - name: Filament smoke (stub or FILAMENT_LIB_DIR in env)
         shell: bash
         run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            export RUST_TEST_THREADS=1
+          fi
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             xvfb-run -a cargo test -p engine_core --features filament --test filament_smoke
           else

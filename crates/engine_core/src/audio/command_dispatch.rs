@@ -14,7 +14,7 @@
 //! - `op=` … `PlayBgm` / `PlaySe` / `PlayVoice` / `StopBgm` / `SetVolume` など
 //! - `err_kind=` … `skip_missing_file` / `io` / `decode` / `backend`
 //!
-//! ログ本文の完全一致をユニットテストで固定しない（プロセス全体で 1 ロガー制約のため）。
+//! グローバルロガーへ流す本文の完全一致はテストしないが、必須キーを含む行は `format_audio_warn_message` の単体テストで検証する。
 //! 手動確認は `RUST_LOG=engine_core::audio=trace` 等を参照。
 
 #[cfg(feature = "audio-kira")]
@@ -37,6 +37,19 @@ fn format_source_entity(source: Option<Entity>) -> String {
     source.map_or_else(|| "-".to_string(), |e| e.to_string())
 }
 
+/// 異常系 warn 1 行の本文（手動 `RUST_LOG` 確認と単体テストで共有）。
+#[cfg(any(test, feature = "audio-kira"))]
+#[must_use]
+fn format_audio_warn_message(
+    seq: u64,
+    source: Option<Entity>,
+    op: &str,
+    err_kind: &str,
+    msg: &str,
+) -> String {
+    format!("seq={seq} source={} op={op} err_kind={err_kind} {msg}", format_source_entity(source),)
+}
+
 #[cfg(feature = "audio-kira")]
 #[allow(clippy::missing_const_for_fn)] // 将来 `const` 化可能だが現状は可読性優先
 fn audio_load_error_kind(e: &AudioLoadError) -> &'static str {
@@ -49,11 +62,8 @@ fn audio_load_error_kind(e: &AudioLoadError) -> &'static str {
 
 #[cfg(feature = "audio-kira")]
 fn log_audio_warn(seq: u64, source: Option<Entity>, op: &str, err_kind: &str, msg: &str) {
-    log::warn!(
-        target: "engine_core::audio",
-        "seq={seq} source={} op={op} err_kind={err_kind} {msg}",
-        format_source_entity(source),
-    );
+    let line = format_audio_warn_message(seq, source, op, err_kind, msg);
+    log::warn!(target: "engine_core::audio", "{line}");
 }
 
 #[cfg(feature = "audio-kira")]
@@ -304,6 +314,29 @@ mod tests {
     use super::*;
     use crate::audio::{AudioCommand, AudioTrack};
     use crate::ecs::world::World;
+
+    #[test]
+    fn test_format_audio_warn_message_includes_required_keys() {
+        let mut w = World::new();
+        let e = w.spawn();
+        let line = format_audio_warn_message(
+            42,
+            Some(e),
+            "PlayBgm",
+            "skip_missing_file",
+            "path does not exist (\"nope\"); skipping",
+        );
+        assert!(line.contains("seq=42"), "{line}");
+        assert!(line.contains("op=PlayBgm"), "{line}");
+        assert!(line.contains("err_kind=skip_missing_file"), "{line}");
+        assert!(line.contains("source=Entity("), "{line}");
+
+        let line_dash = format_audio_warn_message(1, None, "PlaySe", "decode", "boom");
+        assert!(line_dash.contains("seq=1"), "{line_dash}");
+        assert!(line_dash.contains("source=-"), "{line_dash}");
+        assert!(line_dash.contains("op=PlaySe"), "{line_dash}");
+        assert!(line_dash.contains("err_kind=decode"), "{line_dash}");
+    }
 
     #[test]
     fn test_dispatch_recording_sink_fifo_order() {
