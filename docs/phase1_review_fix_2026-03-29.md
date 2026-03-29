@@ -216,3 +216,16 @@
 - **CI P1-1**: `macos-latest` 行列を追加、ジョブ先頭で OS / args / `rustc -vV` を出力。Filament smoke は macOS で `RUST_TEST_THREADS=1`。
 - **PR P1-2**: `pull_request_template.md` に `SAFETY.md` / `// SAFETY:` / 手書き `Send`/`Sync` の明示項目を追加。
 - **計画 doc**: `plan/15_phase2_readiness_plan.md` に visual golden 導入条件を追記。
+
+### 追記（`plan/15`・`TASKS.MD` Phase 1-alpha 同期・同一日続報）
+
+- **CI P1-1 完走**: `windows-latest` / `macos-latest` に **`--no-default-features`** 行を追加し、ubuntu と同様にスタブ音声＋既定 feature の両方を全 OS で検証。
+- **P0-1 設計寄り**: `RenderableManager` 実装は未着手のまま、**対応表・ライフサイクル方針**を `crates/engine_core/src/renderer/mod.rs` のモジュール doc と `plan/15` 実施ログに明文化。
+- **B1-1**: `render_system`（モジュール doc）と `audio_command_system` の rustdoc に前提・縮退動作を追記。
+- **P2-1 たたき台**: 定点メトリクス候補名を `plan/15` 実施ログに列挙（実装・nightly は未着手）。
+- **rustdoc**: `kira.rs` の `purge_faded_tracks` 参照リンクを `Self::purge_faded_tracks` に修正。
+
+### 追記（P0-1 `RenderableManager` 実結線）
+
+- **`filament_bridge.cpp`**: `Scene_submit_mesh_vertical_slice` が `VertexBuffer` / `IndexBuffer` / `RenderableManager` で三角形を構築し、`Engine::getDefaultMaterial()->getDefaultInstance()` をバインド。`renderable_id` ごとに 1 エンティティ（同一 ID の再呼び出しはスキップ）。`Scene_destroy` で C++ グローバルレジストリからエンティティとバッファを `Engine::destroy`。
+- **スタブ**（`FILAMENT_LIB_DIR` 未設定）の挙動は変更なし。CI は引き続きスタブリンク。

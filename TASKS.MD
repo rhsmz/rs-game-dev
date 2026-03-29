@@ -1,6 +1,6 @@
 # タスクリスト — rs-game-dev
 
-> **最終更新**: 2026-03-29（Phase 1-alpha review 残タスクを同ファイルに切り出し）
+> **最終更新**: 2026-03-29（Phase 1-alpha: テスト階層・ログキー辞書を `plan/15` に集約、`GEMINI.md` を `.cursor` 正とする修正）
 > **ビルド状態**: `cargo test --workspace` / `cargo test -p engine_core --no-default-features` / `cargo clippy --workspace --all-targets -- -D warnings` をローカルで確認すること
 > **現在ブランチ**: （作業ブランチに依存）
 
@@ -31,7 +31,7 @@
 | スタブ音声（kira 非リンク） | `cargo test -p engine_core --no-default-features` |
 | 音声キュー FIFO（デバイス非依存） | `cargo test -p engine_core --test audio_command_drain` |
 | 音声ユニット（FIFO・drop 等） | `cargo test -p engine_core audio::command_dispatch` |
-| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨。macOS はメインスレッド制約のため `RUST_TEST_THREADS=1` を推奨） |
+| Filament 1 フレーム smoke | `cargo test -p engine_core --features filament --test filament_smoke`（Linux は `xvfb-run -a` 推奨。macOS はメインスレッド制約のため `RUST_TEST_THREADS=1` を推奨。CI は全行列で実行） |
 | メッシュ縦スライス trace | `ENGINE_CORE_MESH_SUBMIT_TRACE=1` を設定したうえで上記 smoke（`attach_ok` / `skipped_unloaded` をテストが検証） |
 | 音声デバイス依存（ignored） | `cargo test -p engine_core --features audio-kira -- --ignored`（nightly ワークフロー可） |
 
@@ -138,13 +138,21 @@
 
 ## Phase 1-alpha review修正
 
-> 出典: [`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md)  
-> **反映済み（同 doc「反映メモ」）**: P0-2（Audio 運用の一部）/ P0-3（DoD・証跡）/ P1-1（`cargo tree -e features` 可視化）。  
-> 以下は **未完了または継続フォロー** のみを切り出したチェックリスト。
+本節は **Phase 1 外部レビュー**（[`docs/phase1_review_fix_2026-03-29.md`](docs/phase1_review_fix_2026-03-29.md)）および **追加ソースレビュー**（下記 A / B）から切り出した **継続 WBS** である。`## Phase 2` と並走させず、Readiness ゲートは [`plan/15_phase2_readiness_plan.md`](plan/15_phase2_readiness_plan.md) の実施ログと照合する。
+
+### エージェント／開発者向け
+
+- **規約の正**: Cursor は [`.cursor/rules/`](.cursor/rules/) の `.mdc` を読み込む。汎用 AI 向けの短い索引は [`GEMINI.md`](GEMINI.md)（旧 `.agent/` は補助・重複あり）。
+- **タスクの真**: レビュー doc の「反映メモ」は経緯用。**現在の完了状態はこの節の `[x]` / `[ ]` と `plan/15` のログ**を正とする。
+- **テスト階層・ログキー**: [`plan/15`](plan/15_phase2_readiness_plan.md) の「テスト階層」「ログキー・代表メッセージ」節（CI ステップ名は [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）。
+
+以下は **未完了または継続フォロー** を含むチェックリスト（完了分も追跡用に残す）。
 
 ### P0（必須）— Renderer 実幾何描画の閉塞（P0-1）
 
-- [ ] `MeshRenderer` の `renderable_id` と Filament **`RenderableManager` 実体**の対応表（現状は縦スライス FFI のみ・ブリッジ TODO）
+- [x] `renderable_id` → `RenderableManager` 実体への **対応方針・ライフサイクル**を [`renderer/mod.rs` のモジュール doc](crates/engine_core/src/renderer/mod.rs) と [`plan/15`](plan/15_phase2_readiness_plan.md) に記載
+- [x] Filament ブリッジ（`filament_bridge.cpp`）で **`RenderableManager` 実結線**: 既定マテリアル + 三角形、`renderable_id` ごとに 1 エンティティ（`Scene_destroy` で C++ レジストリ解放）。**スタブ**は従来どおり幾何なし
+- [ ] アセットロード連動の **メッシュ／マテリアル 1 対 1 レジストリ**（`renderable_id` を実リソースに解決、デスポーン時の確実な破棄 — Phase 2）
 - [x] 未ロードメッシュ（`renderable_id == 0`）を **warn + skip** に統一
 - [x] カメラ行列（view / proj）反映の最低限の退行防止（`filament_smoke` 内で `resize` → `sync_framebuffer` を挟む）
 - [x] カメラ複数体時の採用ポリシー（ストレージ反復の先頭のみ）を `Camera3D` のモジュール doc に記載
@@ -159,7 +167,7 @@
 ### P1（推奨）— CI マトリクス（P1-1）
 
 - [x] OS 軸で **macOS** ジョブを追加（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
-- [ ] `default` / `--no-default-features` / `--features filament` の **意図したマトリクス**を CI と doc で一致（Windows での `no-default` 等、残ギャップがあれば潰す）
+- [x] `default` / `--no-default-features` / `--features filament` の **意図したマトリクス**を CI と [`plan/15`](plan/15_phase2_readiness_plan.md) の実施ログで一致（ubuntu / windows / macos それぞれ `args: ""` と `--no-default-features`、filament smoke は全行列）
 - [x] `audio_command_drain` は `cargo test --workspace` に含まれる（`engine_core` の `[[test]]`）
 - [x] `filament_smoke` の **Linux xvfb / macOS 単一スレッド**を CI に明記
 - [x] 失敗ログ向けに **matrix os / args** と `rustc -vV` をジョブ先頭で出力
@@ -172,13 +180,8 @@
 
 ### P2（余力）— 可観測性（P2-1）
 
-- [ ] Renderer / Audio の定点メトリクス設計（frame skip 率・audio drop 率など）
-- [ ] nightly 等での回帰トレンド監視・閾値超過通知の導線
-
-### 追加レビュー修正（独立ソースコードレビュー起点 / 2026-03-29）
-
-以下は **過去レビュー文書を参照せず**、`engine_core` の実装を直接読み直して抽出した
-「10点化タスク」（子タスク・孫タスク）である。
+- [x] Renderer / Audio の **メトリクス名たたき台**を [`plan/15`](plan/15_phase2_readiness_plan.md) 実施ログ（P2-1 節）に記載
+- [ ] 上記カウンタの **実装・出力**（ログ集約または OTel 等）と nightly トレンド・閾値通知の導線
 
 #### A. ゲームエンジンのコアロジック完成度を 10 点にする
 
@@ -202,7 +205,7 @@
 
 - [ ] **A4. Input/RNG/ECS の end-to-end 再現性テストを導入**
   - [ ] A4-1. 1シナリオ統合テスト（入力イベント列→ECS→Audio/Renderer 呼び出し順）を追加
-  - [ ] A4-2. `LogicSeed` の派生鎖（親→子→孫）を scene salt と紐づけて固定検証
+  - [x] A4-2. `LogicSeed` の派生鎖（親→子→孫）を scene salt と紐づけて固定検証（`crates/engine_core/src/rng/logic.rs` の `test_derive_child_seed_parent_child_grandchild_chain`）
   - [ ] A4-3. replay 用ログ（frame, input, seed, command seq）の最小フォーマットを策定
 
 - [ ] **A-DoD（10点到達条件）**
@@ -212,17 +215,17 @@
 #### B. ソースコードをエンタープライズ品質 10 点にする
 
 - [ ] **B1. 境界契約（契約違反時の動作）を API に明示**
-  - [ ] B1-1. `render_system` / `audio_command_system` の「前提条件」「失敗時動作」を rustdoc に追記
+  - [x] B1-1. `render_system` / `audio_command_system` の「前提条件」「失敗時動作」を rustdoc に追記
   - [ ] B1-2. `#[must_use]` を戻り値契約がある API に追加（抜け漏れ監査を実施）
   - [ ] B1-3. `panic` 非許容レイヤを定義し、`anyhow` 伝播ポリシーを文書化
 
 - [ ] **B2. テスト戦略を「ユニット中心」から「責務別階層」へ再編**
-  - [ ] B2-1. unit / integration / smoke / nightly の分類を `TASKS.MD` と CI 名称で一致
-  - [ ] B2-2. `#[ignore]` テストの解除条件（データ・環境・閾値）を各テストdocに記載
+  - [x] B2-1. unit / integration / smoke / nightly の分類を `TASKS.MD` と CI 名称で一致（定義は [`plan/15`](plan/15_phase2_readiness_plan.md) の「テスト階層」）
+  - [x] B2-2. `#[ignore]` テストの解除条件（データ・環境・閾値）を各テストdocに記載（`filament_smoke` の visual プレースホルダ等。他は随時 rustdoc 追記）
   - [ ] B2-3. flaky 監視（過去N回成功率）を nightly artifact に保存
 
 - [ ] **B3. ログとメトリクスの標準化（監視可能性）**
-  - [ ] B3-1. `engine_core::renderer` / `engine_core::audio` のログキー辞書を docs 化
+  - [x] B3-1. `engine_core::renderer` / `engine_core::audio` のログキー辞書を docs 化（[`plan/15`](plan/15_phase2_readiness_plan.md)「ログキー・代表メッセージ」）
   - [ ] B3-2. frame skip・mesh attach fail・audio drop を共通メトリクス名で定義
   - [ ] B3-3. CI 失敗時にメトリクスと直近 warn を artifact 化してレビュー時間を短縮
 
