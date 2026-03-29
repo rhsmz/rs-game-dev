@@ -312,7 +312,7 @@ impl<'w, Q: QueryParam> QueryMut<'w, Q> {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = Q::Item<'_>> + '_ {
         // SAFETY:
         // `iter_mut` は `&mut self` を借用するが、内部で `World` への不変参照と可変参照の両方が必要になる。
-        let world_ptr = self.world as *mut World;
+        let world_ptr = std::ptr::from_mut(self.world);
 
         // まず、生ポインタから不変参照を作成し、エンティティを収集する。
         let entities: Vec<Entity> = unsafe { Q::iter_entities(&*world_ptr).collect() };
@@ -328,7 +328,7 @@ impl<'w, Q: QueryParam> QueryMut<'w, Q> {
     pub fn get_mut(&mut self, entity: Entity) -> Option<Q::Item<'_>> {
         // SAFETY: `iter_mut` と同様の理由で unsafe が必要。
         // `&mut self` から引き上げた world_ptr を使うことで、借用期間をこの関数呼び出しの生存期間に限定する。
-        let world_ptr = self.world as *mut World;
+        let world_ptr = std::ptr::from_mut(self.world);
         unsafe { Q::fetch_mut(&mut *world_ptr, entity) }
     }
 }

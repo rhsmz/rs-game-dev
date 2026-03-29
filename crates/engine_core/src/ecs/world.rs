@@ -121,10 +121,7 @@ impl World {
             .get_mut(&TypeId::of::<T>())
             .and_then(|boxed| boxed.as_any_mut().downcast_mut::<ComponentStorage<T>>());
 
-        storage.map_or_else(
-            || panic!("storage type mismatch: this should never happen"),
-            |storage| storage,
-        )
+        storage.unwrap_or_else(|| panic!("storage type mismatch: this should never happen"))
     }
 
     // ── Resource 操作 ──
